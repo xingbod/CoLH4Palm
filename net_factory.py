@@ -648,7 +648,7 @@ class GCN2wayHashingsimple(nn.Module):
 
     
 '''
-
+GCN2wayHashingsimple2 add extra position ecoding 
 '''
 class GCN2wayHashingsimple2(nn.Module):
     def __init__(self, channel=4):
@@ -888,6 +888,19 @@ class Resent18(nn.Module):
         return x
 
     
+class Resent18hashing(nn.Module):
+    def __init__(self, classes=450):
+        super(Resent18hashing, self).__init__()
+        self.model = models.resnet18(pretrained=True)
+        self.model.fc = nn.Linear(self.model.fc.in_features, 1024)
+        self.model.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3,bias=False)
+        self.model.fc.weight.data.normal_(0, 0.01)
+        self.model.fc.bias.data.fill_(0.0)
+        
+    def forward(self, x):
+        x = self.model(x)
+        return x
+    
 class Vgg16(nn.Module):
     def __init__(self, classes=450):
         super(Vgg16, self).__init__()
@@ -903,6 +916,7 @@ def get_network_fn(name):
     networks_zoo = {
     'gcn': GCN(channel=4),
     'Resent18': Resent18(),
+    'Resent18hashing': Resent18hashing(),
     'Vgg16': Vgg16(),
     'GCNCNN': GCNCNN(),
     'gcnca': GCNCA(),
