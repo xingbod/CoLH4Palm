@@ -1,0 +1,6 @@
+!.gitignore
+*.pyc
+*.pth
+dataset
+__pycache__
+.ipynb_checkpoints

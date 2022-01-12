@@ -561,7 +561,10 @@ class GCNhashingOneChannel(nn.Module):
 
         return x
 
-
+    
+'''
+compared with GCN2wayHashing, we remove the max operation
+'''
     
 class GCN2wayHashingsimple(nn.Module):
     def __init__(self, channel=4):
@@ -644,6 +647,9 @@ class GCN2wayHashingsimple(nn.Module):
 
 
     
+'''
+
+'''
 class GCN2wayHashingsimple2(nn.Module):
     def __init__(self, channel=4):
         super(GCN2wayHashingsimple2, self).__init__()
