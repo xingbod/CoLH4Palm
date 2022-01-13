@@ -19,6 +19,7 @@ def get_data(config):
         num_test = len(test_loader.dataset)
         print(len(train_loader.dataset))
         print(len(test_loader.dataset))
+        # R G B R-B N
         return train_loader, test_loader, num_train, num_test
     if "CasiaM" in config["dataset"]:
         batch_size = config["batch_size"]
@@ -29,4 +30,5 @@ def get_data(config):
         num_test = len(test_loader.dataset)
         print(len(train_loader.dataset))
         print(len(test_loader.dataset))
+        # R B B R-B N
         return train_loader, test_loader, num_train, num_test

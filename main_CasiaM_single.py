@@ -64,9 +64,9 @@ def get_config():
     config = {
         "lambda": 0.80,# 0.8 009# 0.3 0085 # 0 011
         "optimizer": {"type": optim.RMSprop, "optim_params": {"lr": 1e-5, "weight_decay": 10 ** -5}},
-        "info": "[CSQCasiaMGCN2]",
+        "info": "[CSQCasiaMGCN1]",
         "batch_size": 256,
-        "net": 'GCN2wayHashingsimple',
+        "net": 'GCNhashingOneChannel',
         "dataset": "CasiaM",
         "n_class":200,# pay attention
         "epoch": args.epochs,
@@ -131,10 +131,10 @@ def test(net,test_loader):
     features = {}
     with torch.no_grad():
         for batch_idx, img in enumerate(test_loader):
-            rbn = img[0].permute(0, 3, 1, 2).to(device, dtype=torch.float)
+            rbn = img[0].permute(0, 3, 1, 2).to(device, dtype=torch.float)#     # R B B R-B N
             label = img[1].to(device)
 
-            output = net(rbn)
+            output = net(rbn[:,1,:,:])#0-R,1-B,2-B,3-R-B, 4--NIR
             FEATS.append(output.cpu().numpy())
 #             FEATS.append(features['feats'].cpu().numpy())
             GT.append(img[1].numpy())
@@ -198,7 +198,7 @@ def train(epoch):
         label = img[1].to(device)
 
         optimizer.zero_grad()
-        u = model(image)
+        u = model(image[:,1,:,:])##0-R,1-B,2-B,3-R-B, 4--NIR
 
         loss = criterion(u, label.float(), 0, config)
         train_loss += loss.item()
