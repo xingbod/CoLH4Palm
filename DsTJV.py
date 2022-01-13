@@ -18,7 +18,7 @@ from torchvision import datasets, transforms
 
 # read image
 import PIL
-from PIL import Image
+from PIL import Image, ImageOps 
 
 tjv_path = 'dataset/Palmvein_ROI_gray_128x128/session1/'
 
@@ -50,9 +50,9 @@ def part_init(istrain=True):
     if istrain:
         for i in tqdm.tqdm(range(train_num)):
             for j in range(7):
-                sid = (i) * 10 + j
-                r_img = np.array(Image.open(os.path.join(tjv_path, "%05d.jpg"%(sid))))
-              
+                sid = (i) * 10 + j + 1
+                r_img = Image.open(os.path.join(tjv_path, "%05d.bmp"%(sid)))
+                r_img =  np.array(ImageOps.autocontrast(r_img))
                 imgprint = np.dstack((r_img,r_img,r_img))
                 
                 prints_list.append(imgprint)
@@ -61,8 +61,9 @@ def part_init(istrain=True):
     else:
         for i in tqdm.tqdm(range(train_num)):
             for j in range(7,10):
-                r_img = np.array(Image.open(os.path.join(tjv_path, "%05d.jpg"%(sid))))
-              
+                sid = (i) * 10 + j
+                r_img = Image.open(os.path.join(tjv_path, "%05d.bmp"%(sid)))
+                r_img =  np.array(ImageOps.autocontrast(r_img))
                 imgprint = np.dstack((r_img,r_img,r_img))
                 
                 prints_list.append(imgprint)

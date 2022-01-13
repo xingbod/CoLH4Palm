@@ -18,7 +18,7 @@ from torchvision import datasets, transforms
 
 # read image
 import PIL
-from PIL import Image
+from PIL import Image, ImageOps 
 # R	B	N
 # 700	460	850
 
@@ -58,13 +58,13 @@ def part_init(istrain=True):
         for i in tqdm.tqdm(range(train_num)):
             for j in range(4):
                 # XXX_(L/R) _ YYY_ZZ .jpg
-                r_img = np.array(Image.open(os.path.join(r_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1))))
+                r_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(r_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1)))))
                 r_normed = (r_img - r_img.min()) / (r_img.max()-r_img.min())
          
-                b_img = np.array(Image.open(os.path.join(b_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1))))
+                b_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(b_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1)))))
                 b_normed = (b_img - b_img.min()) / (b_img.max()-b_img.min())
 
-                n_img = np.array(Image.open(os.path.join(n_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1))))
+                n_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(n_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1)))))
                 # n_normed = (n_img - n_img.min()) / (n_img.max()-n_img.min())
                 
                 rb = r_normed - b_normed * 0.5
@@ -80,13 +80,13 @@ def part_init(istrain=True):
     else:
         for i in tqdm.tqdm(range(train_num)):
             for j in range(4,6):
-                r_img = np.array(Image.open(os.path.join(r_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1))))
+                r_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(r_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1)))))
                 r_normed = (r_img - r_img.min()) / (r_img.max()-r_img.min())
          
-                b_img = np.array(Image.open(os.path.join(b_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1))))
+                b_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(b_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1)))))
                 b_normed = (b_img - b_img.min()) / (b_img.max()-b_img.min())
 
-                n_img = np.array(Image.open(os.path.join(n_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1))))
+                n_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(n_img_path, "%03d_"%(i+1)+"%02d.jpg"%(j+1)))))
                 # n_normed = (n_img - n_img.min()) / (n_img.max()-n_img.min())
                 
                 rb = r_normed - b_normed * 0.5
