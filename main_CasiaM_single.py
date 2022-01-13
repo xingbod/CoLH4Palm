@@ -153,12 +153,12 @@ def test(net,test_loader):
     pred_scores = []
     gt_label = []
 
-    for i in range(400):
-        for j in range(i+1,400):
+    for i in range(2000):
+        for j in range(i+1,2000):
             # pred_scores.append(final[i,j].detach().cpu().numpy())
             a = cossim(GCNFEATS[i,:],GCNFEATS[j,:])
             pred_scores.append(a)
-            gt_label.append(i//2 == j//2)
+            gt_label.append(i//4 == j//4)
 
     pred_scores = np.array(pred_scores)
     gt_label = np.array(gt_label)
