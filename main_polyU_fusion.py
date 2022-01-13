@@ -63,42 +63,6 @@ use_cuda = (args.gpu >= 0) and torch.cuda.is_available()
 writer = SummaryWriter(comment='_'+args.model+'_'+args.comment)
 iteration = 0
 
-parser = argparse.ArgumentParser(description='PyTorch GCN MNIST Training')
-
-parser.add_argument('--epochs', default=50, type=int, metavar='N',
-                    help='number of total epochs to run')
-parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
-                    help='number of data loading workers (default: 4)')
-parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
-                    help='manual epoch number (useful on restarts)')
-parser.add_argument('-b', '--batch-size', default=128, type=int,
-                    metavar='N', help='mini-batch size (default: 64)')
-parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
-                    metavar='LR', help='initial learning rate')
-parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                    help='momentum')
-parser.add_argument('--print-freq', '-p', default=10, type=int,
-                    metavar='N', help='print frequency (default: 10)')
-parser.add_argument('--resume', default='', type=str, metavar='PATH',
-                    help='path to latest checkpoint (default: none)')
-parser.add_argument('--pretrained', default='', type=str, metavar='PATH',
-                    help='path to pretrained checkpoint (default: none)')
-parser.add_argument('--gpu', default=0, type=int,
-                    metavar='N', help='GPU device ID (default: -1)')
-parser.add_argument('--dataset_dir', default='../../MNIST', type=str, metavar='PATH',
-                    help='path to dataset (default: ../MNIST)')
-parser.add_argument('--comment', default='', type=str, metavar='INFO',
-                    help='Extra description for tensorboard')
-parser.add_argument('--model', default='gcn', type=str, metavar='NETWORK',
-                    help='Network to train')
-
-args = parser.parse_args(args=[])
-
-use_cuda = (args.gpu >= 0) and torch.cuda.is_available()
-best_prec1 = 0
-writer = SummaryWriter(comment='_'+args.model+'_'+args.comment)
-iteration = 0
-
 def get_config():
     config = {
         "lambda": 0.1,
