@@ -906,8 +906,10 @@ class Resent18FivePathSharehashing(nn.Module):
         self.model = models.resnet18(pretrained=True)
         self.model.fc = nn.Linear(self.model.fc.in_features, 1024)
         self.model.conv1 = nn.Conv2d(inchannel, 64, kernel_size=7, stride=2, padding=3,bias=False)
-        self.model.fc.weight.data.normal_(0, 0.01)
-        self.model.fc.bias.data.fill_(0.0)
+
+        self.hash_layer = nn.Linear(1024*5, 1024)
+        self.hash_layer.weight.data.normal_(0, 0.01)
+        self.hash_layer.bias.data.fill_(0.0)
         
     def forward(self, x):
         prints = x[:,:3,:,:]
@@ -919,6 +921,7 @@ class Resent18FivePathSharehashing(nn.Module):
         x5 = self.model(x[:,4:5,:,:])
 
         x = torch.cat([x1, x2, x3, x4, x5], 1)
+        x = self.hash_layer(x)
         return x
     
     
