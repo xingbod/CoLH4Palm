@@ -29,7 +29,7 @@ from pyeer.plot import plot_eer_stats
 
 parser = argparse.ArgumentParser(description='PyTorch GCN MNIST Training')
 
-parser.add_argument('--epochs', default=50, type=int, metavar='N',
+parser.add_argument('--epochs', default=2000, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
@@ -48,9 +48,7 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
 parser.add_argument('--pretrained', default='', type=str, metavar='PATH',
                     help='path to pretrained checkpoint (default: none)')
 parser.add_argument('--gpu', default=0, type=int,
-                    metavar='N', help='GPU device ID (default: -1)')
-parser.add_argument('--dataset_dir', default='../../MNIST', type=str, metavar='PATH',
-                    help='path to dataset (default: ../MNIST)')
+                    metavar='N', help='GPU device ID (default: 0)')
 parser.add_argument('--comment', default='', type=str, metavar='INFO',
                     help='Extra description for tensorboard')
 parser.add_argument('--model', default='gcn', type=str, metavar='NETWORK',
@@ -66,13 +64,11 @@ def get_config():
     config = {
         "lambda": 0.5,
         "optimizer": {"type": optim.RMSprop, "optim_params": {"lr": 1e-5, "weight_decay": 10 ** -5}},
-        "info": "[CSQ]",
-        "resize_size": 256,
-        "crop_size": 224,
-        "batch_size": 64,
+        "info": "[CSQCasiaMGCN2]",
+        "batch_size": 256,
         "net": 'GCN2wayHashingsimple',
-        "dataset": "PolyU",
-        "n_class":500,# pay attention
+        "dataset": "CasiaM",
+        "n_class":200,# pay attention
         "epoch": args.epochs,
         "test_map": 10,
         # "device":torch.device("cpu"),
