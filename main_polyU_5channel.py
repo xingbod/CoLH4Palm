@@ -29,7 +29,7 @@ from pyeer.plot import plot_eer_stats
 
 parser = argparse.ArgumentParser(description='PyTorch GCN MNIST Training')
 
-parser.add_argument('--epochs', default=2000, type=int, metavar='N',
+parser.add_argument('--epochs', default=50, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
@@ -48,7 +48,9 @@ parser.add_argument('--resume', default='', type=str, metavar='PATH',
 parser.add_argument('--pretrained', default='', type=str, metavar='PATH',
                     help='path to pretrained checkpoint (default: none)')
 parser.add_argument('--gpu', default=0, type=int,
-                    metavar='N', help='GPU device ID (default: 0)')
+                    metavar='N', help='GPU device ID (default: -1)')
+parser.add_argument('--dataset_dir', default='../../MNIST', type=str, metavar='PATH',
+                    help='path to dataset (default: ../MNIST)')
 parser.add_argument('--comment', default='', type=str, metavar='INFO',
                     help='Extra description for tensorboard')
 parser.add_argument('--model', default='gcn', type=str, metavar='NETWORK',
@@ -62,13 +64,15 @@ iteration = 0
 
 def get_config():
     config = {
-        "lambda": 0.80,# 0.8 009# 0.3 0085 # 0 011
+        "lambda": 0.5,
         "optimizer": {"type": optim.RMSprop, "optim_params": {"lr": 1e-5, "weight_decay": 10 ** -5}},
-        "info": "[CSQCasiaMGCN1]",
-        "batch_size": 256,
-        "net": 'GCNhashingOneChannel',
-        "dataset": "CasiaM",
-        "n_class":200,# pay attention
+        "info": "[CSQ]",
+        "resize_size": 256,
+        "crop_size": 224,
+        "batch_size": 64,
+        "net": 'GCNhashing5Channel',
+        "dataset": "PolyU",
+        "n_class":500,# pay attention
         "epoch": args.epochs,
         "test_map": 10,
         # "device":torch.device("cpu"),
@@ -83,10 +87,10 @@ print(config)
 bit = 1024
 device = config['device']
 
-
+from net_factory import GCNhashingOneChannel
 
 # Load model
-model = get_network_fn(name=config['net'])#GCNCNN
+model = GCNhashingOneChannel(inchannel=5)#GCNCNN
 # print(model)
 
 # Try to visulize the model
@@ -131,10 +135,10 @@ def test(net,test_loader):
     features = {}
     with torch.no_grad():
         for batch_idx, img in enumerate(test_loader):
-            rbn = img[0].permute(0, 3, 1, 2).to(device, dtype=torch.float)#     # R B B R-B N
+            rbn = img[0].permute(0, 3, 1, 2).to(device, dtype=torch.float)
             label = img[1].to(device)
 
-            output = net(rbn[:,1:2,:,:])#0-R,1-B,2-B,3-R-B, 4--NIR
+            output = net(rbn)
             FEATS.append(output.cpu().numpy())
 #             FEATS.append(features['feats'].cpu().numpy())
             GT.append(img[1].numpy())
@@ -153,12 +157,12 @@ def test(net,test_loader):
     pred_scores = []
     gt_label = []
 
-    for i in range(400):
-        for j in range(i+1,400):
+    for i in range(2000):
+        for j in range(i+1,2000):
             # pred_scores.append(final[i,j].detach().cpu().numpy())
             a = cossim(GCNFEATS[i,:],GCNFEATS[j,:])
             pred_scores.append(a)
-            gt_label.append(i//2 == j//2)
+            gt_label.append(i//4 == j//4)
 
     pred_scores = np.array(pred_scores)
     gt_label = np.array(gt_label)
@@ -198,7 +202,7 @@ def train(epoch):
         label = img[1].to(device)
 
         optimizer.zero_grad()
-        u = model(image[:,1:2,:,:])##0-R,1-B,2-B,3-R-B, 4--NIR
+        u = model(image)
 
         loss = criterion(u, label.float(), 0, config)
         train_loss += loss.item()
@@ -209,7 +213,7 @@ def train(epoch):
     print("\b\b\b\b\b\b\b loss:%.5f, lr:%.5f" % (train_loss, optimizer.param_groups[0]['lr']))##loss:0.625
     scheduler.step()
 
-remarks = config['net']+config['dataset']+config['info']
+
 Best_eer = 1.0
 for epoch in range(args.start_epoch, args.epochs):
     print('------------------------------------------------------------------------')
@@ -223,7 +227,7 @@ for epoch in range(args.start_epoch, args.epochs):
                 'state_dict': model.state_dict(),
                 'best_prec1': Best_eer,
                 'optimizer' : optimizer.state_dict(),
-            }, True, filename='checkpoint'+remarks+'.pth.tar', remark=remarks)
+            }, True, filename='checkpoint'+config['net']+config['dataset']+'.pth.tar', remark=config['net']+config['dataset'])
         print("%s epoch:%d, bit:%d, dataset:%s,eer:%.5f, Best eer: %.5f" % (
             config["info"], epoch + 1, bit, config["dataset"], eer, Best_eer))
 

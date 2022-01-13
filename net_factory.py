@@ -521,11 +521,11 @@ class GCN2wayHashing(nn.Module):
 
 
 class GCNhashingOneChannel(nn.Module):
-    def __init__(self, channel=4):
+    def __init__(self, inchannel=1, channel=4):
         super(GCNhashingOneChannel, self).__init__()
         self.channel = channel
         self.model = nn.Sequential(
-            GConv(1, 10, 5, padding=0, stride=1, M=channel, nScale=1, bias=False, expand=True),
+            GConv(inchannel, 10, 5, padding=0, stride=1, M=channel, nScale=1, bias=False, expand=True),
             PositionEncodingSine(10*channel,temp_bug_fix=False),
             nn.BatchNorm2d(10*channel),
             nn.ReLU(inplace=True),
@@ -561,7 +561,6 @@ class GCNhashingOneChannel(nn.Module):
 
         return x
 
-    
 '''
 compared with GCN2wayHashing, we remove the max operation
 '''
