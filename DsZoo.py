@@ -1,5 +1,5 @@
 from DsPolyU  import load_data
-from DsCasiaM  import load_data_cs
+from DsCasiaM  import load_data as load_data_cs
 
 
 
