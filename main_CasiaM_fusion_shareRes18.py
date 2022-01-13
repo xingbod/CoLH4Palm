@@ -64,7 +64,7 @@ def get_config():
     config = {
         "lambda": 0.80,# 0.8 009# 0.3 0085 # 0 011
         "optimizer": {"type": optim.RMSprop, "optim_params": {"lr": 1e-5, "weight_decay": 10 ** -5}},
-        "info": "[CSQCasiaMGCN2]",
+        "info": "[CSQResent18FivePathShare]",
         "batch_size": 256,
         "net": 'GCN2wayHashingsimple',
         "dataset": "CasiaM",
@@ -209,7 +209,7 @@ def train(epoch):
     print("\b\b\b\b\b\b\b loss:%.5f, lr:%.5f" % (train_loss, optimizer.param_groups[0]['lr']))##loss:0.625
     scheduler.step()
 
-
+remarks = config['net']+config['dataset']+config['info']
 Best_eer = 1.0
 for epoch in range(args.start_epoch, args.epochs):
     print('------------------------------------------------------------------------')
@@ -223,7 +223,7 @@ for epoch in range(args.start_epoch, args.epochs):
                 'state_dict': model.state_dict(),
                 'best_prec1': Best_eer,
                 'optimizer' : optimizer.state_dict(),
-            }, True, filename='checkpoint'+config['net']+config['dataset']+'.pth.tar', remark=config['net']+config['dataset'])
+            }, True, filename='checkpoint'+remarks+'.pth.tar', remark=remarks)
         print("%s epoch:%d, bit:%d, dataset:%s,eer:%.5f, Best eer: %.5f" % (
             config["info"], epoch + 1, bit, config["dataset"], eer, Best_eer))
 
