@@ -876,11 +876,11 @@ class GCNCNN(nn.Module):
 
 
 class Resent18(nn.Module):
-    def __init__(self, classes=450):
+    def __init__(self, inchannel=5, classes=450):
         super(Resent18, self).__init__()
         self.model = models.resnet18(pretrained=True)
         self.model.fc = nn.Linear(self.model.fc.in_features, classes)
-        self.model.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3,bias=False)
+        self.model.conv1 = nn.Conv2d(inchannel, 64, kernel_size=7, stride=2, padding=3,bias=False)
 
     def forward(self, x):
         x = self.model(x)
@@ -888,17 +888,39 @@ class Resent18(nn.Module):
 
     
 class Resent18hashing(nn.Module):
-    def __init__(self, classes=450):
+    def __init__(self, inchannel=5, classes=450):
         super(Resent18hashing, self).__init__()
         self.model = models.resnet18(pretrained=True)
         self.model.fc = nn.Linear(self.model.fc.in_features, 1024)
-        self.model.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3,bias=False)
+        self.model.conv1 = nn.Conv2d(inchannel, 64, kernel_size=7, stride=2, padding=3,bias=False)
         self.model.fc.weight.data.normal_(0, 0.01)
         self.model.fc.bias.data.fill_(0.0)
         
     def forward(self, x):
         x = self.model(x)
         return x
+    
+class Resent18FivePathSharehashing(nn.Module):
+    def __init__(self, inchannel=1, classes=450):
+        super(Resent18FivePathSharehashing, self).__init__()
+        self.model = models.resnet18(pretrained=True)
+        self.model.fc = nn.Linear(self.model.fc.in_features, 1024)
+        self.model.conv1 = nn.Conv2d(inchannel, 64, kernel_size=7, stride=2, padding=3,bias=False)
+        self.model.fc.weight.data.normal_(0, 0.01)
+        self.model.fc.bias.data.fill_(0.0)
+        
+    def forward(self, x):
+        prints = x[:,:3,:,:]
+        veins = x[:,3:,:,:]
+        x1 = self.model(x[:,0:1,:,:])
+        x2 = self.model(x[:,1:2,:,:])
+        x3 = self.model(x[:,2:3,:,:])
+        x4 = self.model(x[:,3:4,:,:])
+        x5 = self.model(x[:,4:5,:,:])
+
+        x = torch.cat([x1, x2, x3, x4, x5], 1)
+        return x
+    
     
 class Vgg16(nn.Module):
     def __init__(self, classes=450):
