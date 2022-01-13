@@ -67,7 +67,7 @@ def get_config():
         "info": "[CSQCasiaMGCN1]",
         "batch_size": 256,
         "net": 'GCNhashingOneChannel',
-        "dataset": "CasiaM",
+        "dataset": "PolyU",
         "n_class":200,# pay attention
         "epoch": args.epochs,
         "test_map": 10,
