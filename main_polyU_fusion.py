@@ -23,6 +23,9 @@ import numpy as np
 import tqdm
 # test_loader
 
+from loss import CSQLoss
+from DsZoo import get_data
+
 from pyeer.eer_info import get_eer_stats
 from pyeer.report import generate_eer_report, export_error_rates
 from pyeer.plot import plot_eer_stats
@@ -57,7 +60,7 @@ parser.add_argument('--comment', default='', type=str, metavar='INFO',
 parser.add_argument('--model', default='gcn', type=str, metavar='NETWORK',
                     help='Network to train')
 
-args = parser.parse_args(args=[])
+args = parser.parse_args()
 
 use_cuda = (args.gpu >= 0) and torch.cuda.is_available()
 writer = SummaryWriter(comment='_'+args.model+'_'+args.comment)
@@ -65,29 +68,28 @@ iteration = 0
 
 def get_config():
     config = {
-        "lambda": 0.1,
+        "lambda": 0.5,
         "optimizer": {"type": optim.RMSprop, "optim_params": {"lr": 1e-5, "weight_decay": 10 ** -5}},
         "info": "[CSQ]",
         "resize_size": 256,
         "crop_size": 224,
         "batch_size": 64,
         "net": 'GCN2wayHashingsimple',
-        "dataset": "casia_m",
-        "n_class":500,
-        "epoch": 500,
+        "dataset": "PolyU",
+        "n_class":500,# pay attention
+        "epoch": args.epochs,
         "test_map": 10,
         # "device":torch.device("cpu"),
-        "device": torch.device("cuda:0"),
+        "device": torch.device("cuda:"+args.gpu),
         "bit_list": [1024],
     }
-#     config = config_dataset(config)
     return config
 
 
 config = get_config()
 print(config)
 bit = 1024
-device = torch.device("cuda:0")
+device = config['device']
 
 
 
@@ -108,30 +110,17 @@ if args.pretrained:
         print("=> loading checkpoint '{}'".format(args.pretrained))
         checkpoint = torch.load(args.pretrained)
         model.load_state_dict(checkpoint['state_dict'])
+        print(checkpoint['best_prec1'])
     else:
         print("=> no checkpoint found at '{}'".format(args.pretrained))
-
-    print(checkpoint['best_prec1'])
-
-# train_loader, test_loader, dataset_loader, num_train, num_test, num_dataset = get_data(config)
-batch_size = 300
-train_loader = DataLoader(load_data(training=True), batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True,prefetch_factor=8)  # ,prefetch_factor=2
-test_loader = DataLoader(load_data(training=False), batch_size=64, shuffle=False)  # ,prefetch_factor=2
-
+train_loader, test_loader, num_train, num_test = get_data(config) 
 
 # batch_size = 32
-dataset_loader = train_loader
-num_train = len(train_loader.dataset)
-num_test = len(test_loader.dataset)
-print(len(train_loader.dataset))
-print(len(test_loader.dataset))
-
-config["num_train"] = num_train
 model = model.to(device)
 
 optimizer = config["optimizer"]["type"](model.parameters(), **(config["optimizer"]["optim_params"]))
-
 criterion = CSQLoss(config, bit)
+
 # optimizer = optim.SGD(model.parameters(), lr=0.0001, momentum=args.momentum, weight_decay=3e-05)
 scheduler = StepLR(optimizer, step_size=100, gamma=0.9)
 
@@ -139,11 +128,6 @@ def normalized(a, axis=-1, order=2):
     l2 = np.atleast_1d(np.linalg.norm(a, order, axis))
     l2[l2==0] = 1
     return a / np.expand_dims(l2, axis)
-
-A = np.random.randn(1,2)*10
-# print(A)
-# print(normalized(A,0))
-# print(normalized(A,1))# ok verified
 
 
 def test(net,test_loader):
@@ -166,8 +150,8 @@ def test(net,test_loader):
     GCNFEATS = np.concatenate(FEATS)
     GT = np.concatenate(GT)
     GCNFEATS = normalized(GCNFEATS,1)
-    print('- feats shape:', GCNFEATS.shape)
-    print('- GT shape:', GT.shape)
+#     print('- feats shape:', GCNFEATS.shape)
+#     print('- GT shape:', GT.shape)
     from numpy import dot
     from numpy.linalg import norm
 
@@ -210,7 +194,6 @@ def test(net,test_loader):
 
 ##### INSPECT FEATURES
 
-Best_eer = 1.0
 
 def train(epoch):
     current_time = time.strftime('%H:%M:%S', time.localtime(time.time()))
@@ -231,6 +214,14 @@ def train(epoch):
         loss.backward()
         optimizer.step()
     train_loss = train_loss / len(train_loader)
+    print("\b\b\b\b\b\b\b loss:%.5f, lr:%.5f" % (train_loss, optimizer.param_groups[0]['lr']))##loss:0.625
+    scheduler.step()
+
+
+Best_eer = 1.0
+for epoch in range(args.start_epoch, args.epochs):
+    print('------------------------------------------------------------------------')
+    train(epoch+1)
     if epoch % 50 ==0:
         eer = test(model,test_loader)
         if eer < Best_eer:
@@ -240,16 +231,10 @@ def train(epoch):
                 'state_dict': model.state_dict(),
                 'best_prec1': Best_eer,
                 'optimizer' : optimizer.state_dict(),
-            }, True, filename='checkpointGCN2wayHashingsimple.pth.tar', remark='GCN2wayHashingsimple')
+            }, True, filename='checkpoint'+config['net']+config['dataset']+'.pth.tar', remark=config['net']+config['dataset'])
         print("%s epoch:%d, bit:%d, dataset:%s,eer:%.5f, Best eer: %.5f" % (
             config["info"], epoch + 1, bit, config["dataset"], eer, Best_eer))
-    print("\b\b\b\b\b\b\b loss:%.5f, lr:%.5f" % (train_loss, optimizer.param_groups[0]['lr']))##loss:0.625
-    scheduler.step()
 
-
-for epoch in range(args.start_epoch, args.epochs):
-    print('------------------------------------------------------------------------')
-    train(epoch+1)
 
 print('Finished!')
 print('Best Best_eer:{:.2f}'.format(Best_eer))
