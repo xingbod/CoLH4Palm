@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from gcn.layers import GConv
 from torchvision import datasets, models, transforms
+import STNModule
 
 class CALayer(nn.Module):  # channel attention
     def __init__(self, channel, reduction=16):
@@ -561,6 +562,51 @@ class GCNhashingOneChannel(nn.Module):
 
         return x
 
+    
+    
+class GCNSTNhashingOneChannel(nn.Module):
+    def __init__(self, inchannel=1, channel=4):
+        super(GCNSTNhashingOneChannel, self).__init__()
+        self.channel = channel
+        self.stnmod = STNModule.SpatialTransformer(inchannel, (128,128), 3)
+        self.model = nn.Sequential(
+            GConv(inchannel, 10, 5, padding=0, stride=1, M=channel, nScale=1, bias=False, expand=True),
+            PositionEncodingSine(10*channel,temp_bug_fix=False),
+            nn.BatchNorm2d(10*channel),
+            nn.ReLU(inplace=True),
+
+            GConv(10, 20, 5, padding=0, stride=2, M=channel, nScale=2, bias=False),
+            nn.BatchNorm2d(20*channel),
+            nn.ReLU(inplace=True),
+
+            GConv(20, 40, 5, padding=0, stride=2, M=channel, nScale=3, bias=False),
+            nn.BatchNorm2d(40*channel),
+            nn.ReLU(inplace=True),
+
+            GConv(40, 80, 5, padding=0, stride=2, M=channel, nScale=4, bias=False),
+            nn.BatchNorm2d(80*channel),
+            nn.ReLU(inplace=True),
+
+        )
+        self.hash_layer = nn.Linear(320*12*12, 1024)
+        self.hash_layer.weight.data.normal_(0, 0.01)
+        self.hash_layer.bias.data.fill_(0.0)
+
+    def forward(self, x):
+#         print('**input x.size()',x.size())
+        x = self.model(x)
+#         print('**x.size()',x.size())
+        # x = x.view(-1, self.channel, 80)
+        # x = torch.max(x, 1)[0]
+        # x = x.view(-1, 80 * self.channel)
+        x = x.view(-1, 320*12*12)
+#         print('**x.view()',x.size())
+#         x = torch.max(x, 2)[0]
+        x = self.hash_layer(x)
+
+        return x
+    
+    
 '''
 compared with GCN2wayHashing, we remove the max operation
 '''
@@ -952,6 +998,7 @@ def get_network_fn(name):
     'GCN2wayHashingsimple': GCN2wayHashingsimple(),
     'GCN2wayHashingsimple2': GCN2wayHashingsimple2(),
     'GCNhashingOneChannel': GCNhashingOneChannel(),
+    'GCNSTNhashingOneChannel': GCNSTNhashingOneChannel(),
     }
     if name is '':
         raise ValueError('Specify the network to train. All networks available:{}'.format(networks_zoo.keys()))
