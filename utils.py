@@ -1,7 +1,56 @@
 import shutil
 import torch
 from torch.utils.tensorboard import SummaryWriter
+import sklearn.metrics
+import numpy as np
+from numpy import dot
+from numpy.linalg import norm
 
+
+def cossim(a,b):
+    return dot(a, b)/(norm(a)*norm(b))
+
+def hamming_sim(string1, string2): 
+    # Start with a distance of zero, and count up
+    # Start with a distance of zero, and count up
+    res = string1==string2
+    distance = np.sum(res) 
+    # Return the final count of differences
+    return distance/len(string1)
+
+def one_hot_embedding(labels, num_classes):
+    """Embedding labels to one-hot form.
+
+    Args:
+      labels: (LongTensor) class labels, sized [N,].
+      num_classes: (int) number of classes.
+
+    Returns:
+      (tensor) encoded labels, sized [N, #classes].
+    """
+    y = torch.eye(num_classes) 
+    return y[labels] 
+def getRandPerson(exclude=0,totalcls=200):
+    while True:
+        indx =  np.random.randint(totalcls)
+        if exclude != indx:
+            return indx
+        
+def compute_eer(label, pred, positive_label=1):
+    # all fpr, tpr, fnr, fnr, threshold are lists (in the format of np.array)
+    fpr, tpr, threshold = sklearn.metrics.roc_curve(label, pred)#, positive_label
+    fnr = 1 - tpr
+
+    # the threshold of fnr == fpr
+    eer_threshold = threshold[np.nanargmin(np.absolute((fnr - fpr)))]
+
+    # theoretically eer from fpr and eer from fnr should be identical but they can be slightly differ in reality
+    eer_1 = fpr[np.nanargmin(np.absolute((fnr - fpr)))]
+    eer_2 = fnr[np.nanargmin(np.absolute((fnr - fpr)))]
+
+    # return the mean of eer from fpr and from fnr
+    eer = (eer_1 + eer_2) / 2
+    return eer
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

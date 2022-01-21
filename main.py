@@ -1,160 +1,251 @@
 from __future__ import division
 import os
+import logging
 import time
 import argparse
+
+
 import torch
 from torchvision import datasets, transforms
 import torch.optim as optim
 import torch.nn as nn
 from torch.optim.lr_scheduler import StepLR, MultiStepLR
 import torch.nn.functional as F
-from utils import accuracy, AverageMeter, save_checkpoint, visualize_graph, get_parameters_size
 from torch.utils.tensorboard import SummaryWriter
-from net_factory import get_network_fn
+
+import numpy as np
+from numpy.linalg import norm
+
+# dataset
+from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
+from torch.nn import DataParallel
+
+import tqdm
+
+from loss import CSQLoss,ContrastiveLoss
+
+from UtilsPolyUEval import compute_result_prints_vein,eval_eer_hashcenter,eval_eer_fusion_center,\
+    eval_eer_fusion,eval_eer_cross,eval_top1,eval_fusion_top1,\
+    normalized,compute_result_prints_vein_2path2
 
 
 parser = argparse.ArgumentParser(description='PyTorch GCN MNIST Training')
-parser.add_argument('--epochs', default=50, type=int, metavar='N',
-                    help='number of total epochs to run')
-parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
-                    help='number of data loading workers (default: 4)')
+
+parser.add_argument('--epochs', default=2000, type=int, metavar='N',
+                    help='number of total epochs to run')# resnet 2000 epoch
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
 parser.add_argument('-b', '--batch-size', default=128, type=int,
                     metavar='N', help='mini-batch size (default: 64)')
-parser.add_argument('--lr', '--learning-rate', default=0.01, type=float,
+parser.add_argument('--lr', '--learning-rate', default=0.00001, type=float,
                     metavar='LR', help='initial learning rate')
-parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
-                    help='momentum')
-parser.add_argument('--print-freq', '-p', default=100, type=int,
-                    metavar='N', help='print frequency (default: 10)')
-parser.add_argument('--resume', default='', type=str, metavar='PATH',
-                    help='path to latest checkpoint (default: none)')
 parser.add_argument('--pretrained', default='', type=str, metavar='PATH',
                     help='path to pretrained checkpoint (default: none)')
-parser.add_argument('--gpu', default=-1, type=int,
+parser.add_argument('--gpu', default=0, type=int,
                     metavar='N', help='GPU device ID (default: -1)')
-parser.add_argument('--dataset_dir', default='../../MNIST', type=str, metavar='PATH',
-                    help='path to dataset (default: ../MNIST)')
+parser.add_argument('--bits', default=64, type=int,
+                    metavar='N', help='bits length')
 parser.add_argument('--comment', default='', type=str, metavar='INFO',
                     help='Extra description for tensorboard')
-parser.add_argument('--model', default='', type=str, metavar='NETWORK',
+parser.add_argument('--ds', default='polyu', type=str, metavar='DS',
+                    help='Dataset: polyu, casiam, iitd, tjppv')# use double mark
+parser.add_argument('--model', default='mobile_2path', type=str, metavar='NETWORK',
                     help='Network to train')
 args = parser.parse_args()
 
 use_cuda = (args.gpu >= 0) and torch.cuda.is_available()
-best_prec1 = 0
-writer = SummaryWriter(comment='_'+args.model+'_'+args.comment)
 iteration = 0
 
-# Prepare the MNIST dataset
-normalize = transforms.Normalize((0.1307,), (0.3081,))
-train_transform = transforms.Compose([
-    transforms.ToTensor(),
-    normalize,
-    ])
-test_transform = transforms.Compose([
-    transforms.ToTensor(), 
-    normalize,
-    ])
+def get_config():
+    config = {
+        "lambda": 0.1,
+        "optimizer": {"type": optim.RMSprop, "optim_params": {"lr": 1e-5, "weight_decay": 10 ** -5}},
+        "info": args.comment,
+        "batch_size": args.batch_size,
+        "net": args.model,
+        "dataset": args.ds,
+        "n_class":500,# pay attention
+        "epoch": args.epochs,
+        # "device":torch.device("cpu"),
+        "device": torch.device("cuda:0") if use_cuda else torch.device("cpu"),
+        "bit_list": [32,64,128],
+    }
+    return config
 
 
-train_dataset = datasets.MNIST(root=args.dataset_dir, train=True, 
-    				download=True, transform=train_transform)
-test_dataset = datasets.MNIST(root=args.dataset_dir, train=False, 
-                    download=True,transform=test_transform)
+config = get_config()
+print(config)
+device = config['device']
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size,
-                                num_workers=args.workers, pin_memory=True, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.batch_size,
-                                num_workers=args.workers, pin_memory=True, shuffle=True)
 
+bit = args.bits
+
+remarks = config['net']+config['dataset']+config['info']+str(bit)
+writer = SummaryWriter(comment='_'+remarks)
+logging.basicConfig(level=logging.DEBUG,#控制台打印的日志级别
+                    filename= remarks+'_app.log',
+                    filemode='a',##模式，有w和a，w就是写模式，a是追加模式
+                    format=
+                    '%(asctime)s - %(pathname)s[line:%(lineno)d] - %(levelname)s: %(message)s' )
+
+# from net_factory import mobilenet_v3_largehashing2Path
+# # Load model
+# model = mobilenet_v3_largehashing2Path(inchannel1=3, inchannel2=3,bits = bit)#GCNCNN
+# # print(model)
+#
+# from net_factory import efficientnet_b72Path
+# # Load model
+# model = efficientnet_b72Path(inchannel1=3, inchannel2=3,bits = bit)#GCNCNN
+# # print(model)
+
+from net_factory import Resent18hashing
 # Load model
-model = get_network_fn(args.model)
-print(model)
+model = Resent18hashing(inchannel1=3, inchannel2=3,bits = bit)#GCNCNN
+# print(model)
+
 
 # Try to visulize the model
 try:
-	visualize_graph(model, writer, input_size=(1, 1, 28, 28))
+	visualize_graph(model, writer, input_size=(1, 1, 128, 128))
 except:
 	print('\nNetwork Visualization Failed! But the training procedure continue.')
 
-# optimizer = optim.Adadelta(model.parameters(), lr=args.lr, rho=0.9, eps=1e-06, weight_decay=3e-05)
-# optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=3e-05)
-optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=3e-05)
-scheduler = StepLR(optimizer, step_size=10, gamma=0.5)
-criterion = nn.CrossEntropyLoss()
-
-device = torch.device("cuda" if use_cuda else "cpu")
-model = model.to(device)
-criterion = criterion.to(device)
-
 # Calculate the total parameters of the model
-print('Model size: {:0.2f} million float parameters'.format(get_parameters_size(model)/1e6))
 
 if args.pretrained:
     if os.path.isfile(args.pretrained):
         print("=> loading checkpoint '{}'".format(args.pretrained))
         checkpoint = torch.load(args.pretrained)
         model.load_state_dict(checkpoint['state_dict'])
+        print(checkpoint['best_prec1'])
     else:
         print("=> no checkpoint found at '{}'".format(args.pretrained))
+        
+
+#Dataset
+from DsZoo import load_data
+batch_size = config["batch_size"]
+train_loader = DataLoader(load_data(ds = args.ds,training=True,train_ratio = 1,sample_ratio = 0.666), batch_size=batch_size, shuffle=True, num_workers=8,       pin_memory=True,prefetch_factor=2)  # ,prefetch_factor=2
+test_loader = DataLoader(load_data(ds = args.ds,training=False,train_ratio = 1,sample_ratio = 0.666), batch_size=batch_size, shuffle=False)  # ,prefetch_factor=2
+# dataset_loader = test_loader
+num_train = len(train_loader.dataset)
+num_test = len(test_loader.dataset)
+print('train num: ',len(train_loader.dataset))
+print('test num: ',len(test_loader.dataset))
+
+# batch_size = 32
+model = model.to(device)
+print('\nTrainable parameters : {}\n'.format(sum(p.numel() for p in model.parameters() if p.requires_grad))) 
+
+optimizer = config["optimizer"]["type"](model.parameters(), **(config["optimizer"]["optim_params"]))
+criterion = CSQLoss(config, bit)
+criterion_ctive = ContrastiveLoss() # ContrastiveLoss as the domain gap loss
+
+# optimizer = optim.SGD(model.parameters(), lr=0.0001, momentum=args.momentum, weight_decay=3e-05)
+scheduler = StepLR(optimizer, step_size=100, gamma=0.9)
+
+
+def test(net,test_loader, epoch):
+    FEATS_prints, FEATS_vein, GT = compute_result_prints_vein_2path2(test_loader, net, device)
+    FEATS_prints_binay,FEATS_vein_binay = FEATS_prints>0,FEATS_vein>0
+    FEATS_prints, FEATS_vein = normalized(FEATS_prints,1), normalized(FEATS_vein,1)
+    clsses = 500
+    sampesCls = 4
+
+    accprints = eval_top1(FEATS_prints_binay,criterion, clsses = clsses, sampesCls = sampesCls)
+    accveins = eval_top1(FEATS_vein_binay,criterion, clsses = clsses, sampesCls = sampesCls)
+    eer_prints_center = eval_eer_hashcenter(FEATS_prints_binay,criterion, clsses = clsses, sampesCls = sampesCls)
+    eer_veins_center = eval_eer_hashcenter(FEATS_vein_binay,criterion, clsses = clsses, sampesCls = sampesCls)
+    eer_fusion_center = eval_eer_fusion_center(FEATS_prints_binay,FEATS_vein_binay,criterion, clsses = clsses, sampesCls = sampesCls)
+    eer_fusion = eval_eer_fusion(FEATS_prints,FEATS_vein, clsses = clsses, sampesCls = sampesCls)
+    eer_cross = eval_eer_cross(FEATS_prints,FEATS_vein, clsses = clsses, sampesCls = sampesCls) 
+    acc = eval_fusion_top1(FEATS_prints_binay,FEATS_vein_binay,criterion, clsses = clsses, sampesCls = sampesCls)
+
+    print('The top1 acc for prints is: \t {:.5f}'.format(accprints))    
+    print('The top1 acc for veins is: \t {:.5f}'.format(accveins))
+    print('The top1 acc for fusion is: \t {:.5f}'.format(acc))
+    print('The equal error rate for center hash prints: \t {:.5f}'.format(eer_prints_center))
+    print('The equal error rate for center hash veins: \t  {:.5f}'.format(eer_veins_center))
+    print('The equal error rate for fusion on center is: {:.5f}'.format(eer_fusion_center))
+    print('The equal error rate for fusion is: \t {:.5f}'.format(eer_fusion))
+    print('The equal error rate for cross is: \t {:.5f}'.format(eer_cross))
+    
+    logging.info('epoch at {:.5f}'.format(epoch) )
+    logging.info('The top1 acc for prints is: \t {:.5f}'.format(accprints))
+    logging.info('The top1 acc for veins is: \t {:.5f}'.format(accveins))
+    logging.info('The top1 acc for fusion is: \t {:.5f}'.format(acc))
+    logging.info('The equal error rate for center hash prints: \t {:.5f}'.format(eer_prints_center))
+    logging.info('The equal error rate for center hash veins: \t  {:.5f}'.format(eer_veins_center))
+    logging.info('The equal error rate for fusion on center is: {:.5f}'.format(eer_fusion_center))
+    logging.info('The equal error rate for fusion is: \t {:.5f}'.format(eer_fusion))
+    logging.info('The equal error rate for cross is: \t {:.5f}'.format(eer_cross))
+
+    writer.add_scalar('Acc/printstop1', accprints, epoch)
+    writer.add_scalar('Acc/eer_prints_center', eer_prints_center, epoch)
+    writer.add_scalar('Acc/eer_veins_center', eer_veins_center, epoch)
+    writer.add_scalar('Acc/eer_fusion_center', eer_fusion_center, epoch)
+    writer.add_scalar('Acc/eer_fusion', eer_fusion, epoch)
+    writer.add_scalar('Acc/eer_cross', eer_cross, epoch)
+    writer.add_scalar('Acc/fusion_top1', acc, epoch)
+    return eer_cross
+
+
 
 def train(epoch):
+    current_time = time.strftime('%H:%M:%S', time.localtime(time.time()))
+    print("%s[%2d/%2d][%s] bit:%d, dataset:%s, training...." % (
+        config["info"], epoch + 1, config["epoch"], current_time, bit, config["dataset"]), end="")
     model.train()
-    global iteration
-    st = time.time()
-    for batch_idx, (data, target) in enumerate(train_loader):
-        iteration += 1
-        data, target = data.to(device), target.to(device)
+    train_loss = 0
+    for batch_idx, img in enumerate(train_loader):
+        in1 = img[0].to(device, dtype=torch.float)
+        in2 = img[1].to(device, dtype=torch.float)
+        label = img[2].to(device)
         optimizer.zero_grad()
-        output = model(data)
-        prec1, = accuracy(output, target)
-        loss = criterion(output, target)
+        u1,u2 = model(in1,in2)
+        
+        loss1, (center_loss1 , Q_loss1) = criterion(u1, label.float(), 0, config)
+        loss2, (center_loss2 , Q_loss2) = criterion(u2, label.float(), 0, config)
+        #img0维度为torch.Size([32, 1, 100, 100])，32是batch，label为torch.Size([32, 1])
+                
+        perms = torch.randperm(u1.shape[0])# plan to perm the U2
+        u2, label2 = u2[perms,:], label[perms]
+        label3 = (label2 == label)*1
+        loss3 = criterion_ctive(u1,u2,label3)
+
+        loss = loss1 + loss2 + loss3 * 0.0001
+        train_loss += loss.item()
+
         loss.backward()
         optimizer.step()
-        if batch_idx % args.print_freq == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}, Accuracy: {:.2f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item(), prec1.item()))
-            writer.add_scalar('Loss/Train', loss.item(), iteration)
-            writer.add_scalar('Accuracy/Train', prec1, iteration)
-    epoch_time = time.time() - st
-    print('Epoch time:{:0.2f}s'.format(epoch_time))
-    scheduler.step()
+    train_loss = train_loss / num_train
+    writer.add_scalar('Loss/Train', train_loss, epoch)
+    writer.add_scalar('Loss/center_loss', center_loss1.item(), epoch)
+    writer.add_scalar('Loss/Q_loss', Q_loss1.item(), epoch)
+    writer.add_scalar('Loss/c_loss', loss3.item(), epoch)
+    print("\b\b\b loss:%.5f,center_loss:%.5f,Q_loss:%.5f,loss3:%.5f,lr:%.6f" % (train_loss,center_loss1,Q_loss1,loss3, optimizer.param_groups[0]['lr']))##loss:0.625
+    # scheduler.step()
 
-def test(epoch):
-    model.eval()
-    test_loss = AverageMeter()
-    acc = AverageMeter()
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss.update(F.cross_entropy(output, target, reduction='mean').item(), target.size(0))
-            prec1, = accuracy(output, target) # test precison in one batch
-            acc.update(prec1.item(), target.size(0))
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {:.2f}%\n'.format(test_loss.avg, acc.avg))
-    writer.add_scalar('Loss/Test', test_loss.avg, epoch)
-    writer.add_scalar('Accuracy/Test', acc.avg, epoch)
-    return acc.avg
-
+Best_eer = 1.0
 for epoch in range(args.start_epoch, args.epochs):
     print('------------------------------------------------------------------------')
     train(epoch+1)
-    prec1 = test(epoch+1)
+    if epoch % 50 ==0:
+        eer = test(model,test_loader, epoch)
+        if eer < Best_eer:
+            Best_eer = eer
+            save_checkpoint({
+                'epoch': epoch + 1,
+                'state_dict': model.state_dict(),
+                'best_prec1': Best_eer,
+                'optimizer' : optimizer.state_dict(),
+            }, True, filename='checkpoint'+remarks+'.pth.tar', remark=remarks)
+        print("%s epoch:%d, bit:%d, dataset:%s,eer:%.5f, Best eer: %.5f" % (
+            config["info"], epoch + 1, bit, config["dataset"], eer, Best_eer))
 
-    # remember best prec@1 and save checkpoint
-    is_best = prec1 > best_prec1
-    best_prec1 = max(prec1, best_prec1)
-    save_checkpoint({
-        'epoch': epoch + 1,
-        'state_dict': model.state_dict(),
-        'best_prec1': best_prec1,
-        'optimizer' : optimizer.state_dict(),
-    }, is_best)
 
 print('Finished!')
-print('Best Test Precision@top1:{:.2f}'.format(best_prec1))
-writer.add_scalar('Best TOP1', best_prec1, 0)
+print('Best Best_eer:{:.2f}'.format(Best_eer))
+writer.add_scalar('Best Best_eer', Best_eer, 0)
 writer.close()
