@@ -16,6 +16,7 @@ import time
 import numpy as np
 from scipy.linalg import hadamard  # direct import  hadamrd matrix from scipy
 import random
+import tqdm
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -55,7 +56,7 @@ class CSQLoss(torch.nn.Module):
 
         if H_2K.shape[0] < n_class:
             hash_targets.resize_(n_class, bit)
-            for k in range(20):
+            for k in tqdm.tqdm(range(20)):
                 for index in range(H_2K.shape[0], n_class):
                     ones = torch.ones(bit)
                     # Bernouli distribution

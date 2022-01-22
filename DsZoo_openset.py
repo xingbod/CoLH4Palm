@@ -56,7 +56,7 @@ def one_hot_embedding(labels, num_classes):
 
 
 # one_hot_embedding(1, 10)
-def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666):
+def part_init_polyu(istrain=True, train_ratio=0.9, sample_ratio=1):
     r_list = []
     b_list = []
     vein_list = []
@@ -66,13 +66,20 @@ def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666):
     # split all data into train, test data
     #     train_ratio = 1
     #     sample_ratio = 0.333
+
     train_num = math.ceil(500 * train_ratio)
     sample_num = math.ceil(12 * sample_ratio)
     print("split train users:", train_num)
     print("split train samples:", sample_num, 'total sample:', 12)
+
+    users_permu = np.random.permutation(500)
+    user_permu_train = users_permu[:train_num]
+    user_permu_test = users_permu[train_num:]
+
+
     if istrain:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in range(sample_num):
+        for i in user_permu_train:
+            for j in range(12):
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(r_img_path, "%04d_" % (i + 1) + "%04d.jpg" % (j + 1)))))
 
@@ -96,8 +103,8 @@ def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666):
                 labels.append(one_hot_embedding(i, train_num))
     #                 labels.append(i)
     else:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in range(sample_num, 12):
+        for i in user_permu_test:
+            for j in range(12):
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(r_img_path, "%04d_" % (i + 1) + "%04d.jpg" % (j + 1)))))
                 # r_normed = (r_img - r_img.min()) / (r_img.max()-r_img.min())
@@ -139,15 +146,16 @@ def part_init_tjppv(istrain=True, train_ratio=1, sample_ratio=0.666):
     print("split train users:", train_num)
     print("split train samples:", sample_num)
 
-    sample_permu = np.random.permutation(20)
-    sample_permu_train = sample_permu[:sample_num]
-    sample_permu_test = sample_permu[sample_num:]
-    print("sample_permu_train:", sample_permu_train)
-    print("sample_permu_test:", sample_permu_test)
+    users_permu = np.random.permutation(600)
+    user_permu_train = users_permu[:train_num]
+    user_permu_test = users_permu[train_num:]
+
+    print("user_permu_train:", user_permu_train)
+    print("user_permu_test:", user_permu_test)
 
     if istrain:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in sample_permu_train:
+        for i in user_permu_train:
+            for j in range(20):
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(tjp_path, "%04d_" % (i + 1) + "%04d.jpg" % (j + 1)))))  # +1
                 prints_list.append(r_img)
@@ -163,8 +171,8 @@ def part_init_tjppv(istrain=True, train_ratio=1, sample_ratio=0.666):
                 labels.append(one_hot_embedding(i, train_num))
     #                 labels.append(i)
     else:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in sample_permu_test:
+        for i in user_permu_test:
+            for j in range(20):
                 r_img = np.array(
                     ImageOps.autocontrast(Image.open(os.path.join(tjp_path, "%04d_" % (i + 1) + "%04d.jpg" % (j + 1)))))
                 prints_list.append(r_img)
@@ -196,21 +204,30 @@ def part_init_iitd(istrain=True, train_ratio=1, sample_ratio=0.666):
     sample_num = math.ceil(5 * sample_ratio)
     print("split train users:", train_num)
     print("split samples:", sample_num)
+
+    users_permu = np.random.permutation(460)
+    user_permu_train = users_permu[:train_num]
+    user_permu_test = users_permu[train_num:]
+
+    print("user_permu_train:", user_permu_train)
+    print("user_permu_test:", user_permu_test)
+
+
     if sample_num < 2:
         print('attention, testing sample not enough!')
     if istrain:
-        for i in tqdm.tqdm(range(train_num)):
+        for i in user_permu_train:
             fileid = (i) % 230 + 1
-            for j in range(sample_num):
+            for j in range(5):
                 r_img = np.array(
                     Image.open(os.path.join(iitd_path, "%04d" % (i + 1), "%03d_" % fileid + "%01d.bmp" % (j + 1))))
                 prints_list.append(r_img)
                 labels.append(one_hot_embedding(i, train_num))
     #                 labels.append(i)
     else:
-        for i in tqdm.tqdm(range(train_num)):
+        for i in user_permu_test:
             fileid = (i) % 230 + 1
-            for j in range(sample_num, 5):
+            for j in range(5):
                 r_img = np.array(
                     Image.open(os.path.join(iitd_path, "%04d" % (i + 1), "%03d_" % fileid + "%01d.bmp" % (j + 1))))
                 prints_list.append(r_img)
@@ -232,11 +249,19 @@ def part_init_casiam(istrain=True, train_ratio=1, sample_ratio=0.666):
     sample_num = math.ceil(6 * sample_ratio)  # 200 users
     print("split train users:", train_num)
     print("split samples:", sample_num)
+
+    users_permu = np.random.permutation(200)
+    user_permu_train = users_permu[:train_num]
+    user_permu_test = users_permu[train_num:]
+
+    print("user_permu_train:", user_permu_train)
+    print("user_permu_test:", user_permu_test)
+
     if sample_num < 2:
         print('attention, testing sample not enough!')
     if istrain:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in range(sample_num):
+        for i in user_permu_train:
+            for j in range(6):
                 # XXX_(L/R) _ YYY_ZZ .jpg
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(casia_r_img_path, "%03d_" % (i + 1) + "%02d.jpg" % (j + 1)))))
@@ -255,8 +280,8 @@ def part_init_casiam(istrain=True, train_ratio=1, sample_ratio=0.666):
                 labels.append(one_hot_embedding(i, train_num))
     #                 labels.append(i)
     else:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in range(sample_num, 6):
+        for i in user_permu_test:
+            for j in range(6):
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(casia_r_img_path, "%03d_" % (i + 1) + "%02d.jpg" % (j + 1)))))
 

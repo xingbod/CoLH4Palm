@@ -21,12 +21,13 @@ from torch.utils.data import Dataset
 from torch.nn import DataParallel
 
 import tqdm
+import math
 
 from loss import CSQLoss, ContrastiveLoss
 
 from UtilsPolyUEval import compute_result_prints_vein, eval_eer_hashcenter, eval_eer_fusion_center, \
     eval_eer_fusion, eval_eer_cross, eval_top1, eval_fusion_top1, \
-    normalized, compute_result_prints_vein_2path2
+    normalized, compute_result_prints_vein_2path2, compute_result_prints_vein_2path_iitd
 from utils import accuracy, AverageMeter, save_checkpoint, visualize_graph, get_parameters_size
 
 parser = argparse.ArgumentParser(description='PyTorch GCN MNIST Training')
@@ -65,7 +66,7 @@ def get_config():
         "batch_size": args.batch_size,
         "net": args.model,
         "dataset": args.ds,
-        "n_class": 1,  # pay attention, update below
+        "n_class": 500,  # pay attention
         "epoch": args.epochs,
         "device": torch.device("cuda:0") if use_cuda else torch.device("cpu"),
         "bit_list": [32, 64, 128],  #
@@ -97,10 +98,10 @@ logging.basicConfig(level=logging.DEBUG,  # 控制台打印的日志级别
 # model = efficientnet_b72Path(inchannel1=3, inchannel2=3,bits = bit)#GCNCNN
 # # print(model)
 
-from net_factory import Resent182Path
+from net_factory import Resent18hashing
 
 # Load model
-model = Resent182Path(inchannel1=3, inchannel2=3, bits=bit)  # GCNCNN
+model = Resent18hashing(inchannel=1, bits=bit)  # GCNCNN
 # print(model)
 
 
@@ -122,8 +123,7 @@ if args.pretrained:
         print("=> no checkpoint found at '{}'".format(args.pretrained))
 
 # Dataset
-from DsZoo import load_data
-import math
+from DsZoo import load_data_single_channel as load_data
 
 sample_ratio = 0.5
 if args.ds == 'polyu':
@@ -155,6 +155,8 @@ num_test = len(test_loader.dataset)
 print('train num: ', len(train_loader.dataset))
 print('test num: ', len(test_loader.dataset))
 print('train num per class: ', sampesCls)
+print('test num per class: ', 5 - sampesCls)
+sampesCls = 5 - sampesCls
 
 # batch_size = 32
 model = model.to(device)
@@ -169,19 +171,18 @@ scheduler = StepLR(optimizer, step_size=100, gamma=0.9)
 
 
 def test(net, test_loader, epoch, clsses, sampesCls):
-    FEATS_prints, FEATS_vein, GT = compute_result_prints_vein_2path2(test_loader, net, device)
-    FEATS_prints_binay, FEATS_vein_binay = FEATS_prints > 0, FEATS_vein > 0
-    FEATS_prints, FEATS_vein = normalized(FEATS_prints, 1), normalized(FEATS_vein, 1)
+    FEATS_prints, FEATS_vein, GT = compute_result_prints_vein_2path_iitd(test_loader, net, device)
+    FEATS_prints_binay = FEATS_prints > 0
+    FEATS_prints = normalized(FEATS_prints, 1)
 
     accprints = eval_top1(FEATS_prints_binay, criterion, clsses=clsses, sampesCls=sampesCls)
-    accveins = eval_top1(FEATS_vein_binay, criterion, clsses=clsses, sampesCls=sampesCls)
+    accveins = 0
     eer_prints_center = eval_eer_hashcenter(FEATS_prints_binay, criterion, clsses=clsses, sampesCls=sampesCls)
-    eer_veins_center = eval_eer_hashcenter(FEATS_vein_binay, criterion, clsses=clsses, sampesCls=sampesCls)
-    eer_fusion_center = eval_eer_fusion_center(FEATS_prints_binay, FEATS_vein_binay, criterion, clsses=clsses,
-                                               sampesCls=sampesCls)
-    eer_fusion = eval_eer_fusion(FEATS_prints, FEATS_vein, clsses=clsses, sampesCls=sampesCls)
-    eer_cross = eval_eer_cross(FEATS_prints, FEATS_vein, clsses=clsses, sampesCls=sampesCls)
-    acc = eval_fusion_top1(FEATS_prints_binay, FEATS_vein_binay, criterion, clsses=clsses, sampesCls=sampesCls)
+    eer_veins_center = 0
+    eer_fusion_center = 0
+    eer_fusion = 0
+    eer_cross = 0
+    acc = 0
 
     print('The top1 acc for prints is: \t {:.5f}'.format(accprints))
     print('The top1 acc for veins is: \t {:.5f}'.format(accveins))
@@ -220,21 +221,13 @@ def train(epoch):
     train_loss = 0
     for batch_idx, img in enumerate(train_loader):
         in1 = img[0].to(device, dtype=torch.float)
-        in2 = img[1].to(device, dtype=torch.float)
-        label = img[2].to(device)
+        label = img[1].to(device)
         optimizer.zero_grad()
-        u1, u2 = model(in1, in2)
+        u1 = model(in1)
 
-        loss1, (center_loss1, Q_loss1) = criterion(u1, label.float(), 0, config)
-        loss2, (center_loss2, Q_loss2) = criterion(u2, label.float(), 0, config)
+        loss, (center_loss1, Q_loss1) = criterion(u1, label.float(), 0, config)
         # img0维度为torch.Size([32, 1, 100, 100])，32是batch，label为torch.Size([32, 1])
 
-        perms = torch.randperm(u1.shape[0])  # plan to perm the U2
-        u2, label2 = u2[perms, :], label[perms]
-        label3 = (label2 == label) * 1
-        loss3 = criterion_ctive(u1, u2, label3)
-
-        loss = loss1 + loss2 + loss3 * 0.0001
         train_loss += loss.item()
 
         loss.backward()
@@ -243,9 +236,8 @@ def train(epoch):
     writer.add_scalar('Loss/Train', train_loss, epoch)
     writer.add_scalar('Loss/center_loss', center_loss1.item(), epoch)
     writer.add_scalar('Loss/Q_loss', Q_loss1.item(), epoch)
-    writer.add_scalar('Loss/c_loss', loss3.item(), epoch)
     print("\b\b\b loss:%.5f,center_loss:%.5f,Q_loss:%.5f,loss3:%.5f,lr:%.6f" % (
-    train_loss, center_loss1, Q_loss1, loss3, optimizer.param_groups[0]['lr']))  ##loss:0.625
+    train_loss, center_loss1, Q_loss1, 0, optimizer.param_groups[0]['lr']))  ##loss:0.625
     # scheduler.step()
 
 

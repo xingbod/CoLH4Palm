@@ -95,6 +95,25 @@ def compute_result_prints_vein_2path2(dataloader, net, device):
     GT = np.concatenate(GT)
 
     return FEATS_prints, FEATS_vein, GT
+
+def compute_result_prints_vein_2path_iitd(dataloader, net, device):
+    FEATS_prints,FEATS_vein,GT = [],[],[]
+    net.eval()
+    with torch.no_grad():
+        for batch_idx, img in enumerate(dataloader):
+            rbn = img[0].to(device, dtype=torch.float)
+
+            output1 = net(rbn)#0-R,1-B,2-B,3-R-B, 4--NIR
+
+            FEATS_prints.append(output1.cpu().numpy())
+#             FEATS.append(features['feats'].cpu().numpy())
+            GT.append(img[1])
+
+    FEATS_prints = np.concatenate(FEATS_prints)
+    GT = np.concatenate(GT)
+
+    return FEATS_prints, FEATS_vein, GT
+
 def compute_result_prints_vein_2path_TJ(dataloader, net, device):
     FEATS_prints,FEATS_vein,GT = [],[],[]
     net.eval()
@@ -164,7 +183,7 @@ def eval_eer_fusion_center(FEATS_prints_binay,FEATS_veins_binay,criterion, clsse
 
 
 ### FEATS_prints_binay -> FEATS_prints
-def eval_eer_fusion(FEATS_prints_binay,FEATS_veins_binay, clsses = 500, sampesCls = 4):
+def eval_eer_fusion(FEATS_prints_binay,FEATS_veins_binay, clsses = 500, sampesCls = 4, disfun='cossim'):
     totalsamples = clsses*sampesCls
     pred_scores = []
     gt_label = []
@@ -172,8 +191,12 @@ def eval_eer_fusion(FEATS_prints_binay,FEATS_veins_binay, clsses = 500, sampesCl
     for i in range(totalsamples):
         for j in range(i+1,totalsamples):
             # pred_scores.append(final[i,j].detach().cpu().numpy())
-            a1 = cossim(FEATS_prints_binay[i,:],FEATS_prints_binay[j,:])
-            a2 = cossim(FEATS_veins_binay[i,:],FEATS_veins_binay[j,:])
+            if disfun == 'cossim':
+                a1 = cossim(FEATS_prints_binay[i,:],FEATS_prints_binay[j,:])
+                a2 = cossim(FEATS_veins_binay[i,:],FEATS_veins_binay[j,:])
+            else:
+                a1 = hamming_sim(FEATS_prints_binay[i,:],FEATS_prints_binay[j,:])
+                a2 = hamming_sim(FEATS_veins_binay[i,:],FEATS_veins_binay[j,:])
             pred_scores.append((a1+a2)/2.0)
             gt_label.append(i//sampesCls == j//sampesCls)
 
@@ -205,20 +228,19 @@ def eval_eer(FEATS_prints, clsses = 500, sampesCls = 4, disfun='cossim'):
     eer = compute_eer(gt_label, pred_scores)
     return eer
 
-def eval_eer_cross(FEATS_prints,FEATS_veins, clsses = 500, sampesCls = 4):
+def eval_eer_cross(FEATS_prints,FEATS_veins, clsses = 500, sampesCls = 4, disfun=cossim):
     totalsamples = clsses*sampesCls
     pred_scores_cross = []
     gt_label_cross = []
 
     for i in tqdm.tqdm(range(totalsamples)):#50 11
-        a = cossim(FEATS_prints[i,:],FEATS_veins[i,:])# RED vs NIR same 
+        a = disfun(FEATS_prints[i,:],FEATS_veins[i,:])# RED vs NIR same
         pred_scores_cross.append(a)
         gt_label_cross.append(True)
 
-        impo = cossim(FEATS_prints[i,:],FEATS_veins[getRandPerson(exclude=i//sampesCls,totalcls=clsses)*sampesCls,:])
+        impo = disfun(FEATS_prints[i,:],FEATS_veins[getRandPerson(exclude=i//sampesCls,totalcls=clsses)*sampesCls,:])
         pred_scores_cross.append(impo)
         gt_label_cross.append(False)
-
 
     pred_scores_cross = np.array(pred_scores_cross)
     gt_label_cross = np.array(gt_label_cross)

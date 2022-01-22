@@ -24,9 +24,9 @@ import tqdm
 
 from loss import CSQLoss, ContrastiveLoss
 
-from UtilsPolyUEval import compute_result_prints_vein, eval_eer_hashcenter, eval_eer_fusion_center, \
-    eval_eer_fusion, eval_eer_cross, eval_top1, eval_fusion_top1, \
-    normalized, compute_result_prints_vein_2path2
+from UtilsPolyUEval import compute_result_prints_vein,eval_eer_hashcenter,eval_eer_fusion_center,\
+    eval_eer_fusion,eval_eer_cross,eval_top1,eval_fusion_top1,\
+    normalized,compute_result_prints_vein_2path2,compute_result_prints_vein_2path_iitd,eval_eer
 from utils import accuracy, AverageMeter, save_checkpoint, visualize_graph, get_parameters_size
 
 parser = argparse.ArgumentParser(description='PyTorch GCN MNIST Training')
@@ -45,7 +45,7 @@ parser.add_argument('--gpu', default=0, type=int,
                     metavar='N', help='GPU device ID (default: -1)')
 parser.add_argument('--bits', default=64, type=int,
                     metavar='N', help='bits length')
-parser.add_argument('--comment', default='', type=str, metavar='INFO',
+parser.add_argument('--comment', default='open', type=str, metavar='INFO',
                     help='Extra description for tensorboard')
 parser.add_argument('--ds', default='polyu', type=str, metavar='DS',
                     help='Dataset: polyu, casiam, iitd, tjppv')  # use double mark
@@ -122,21 +122,22 @@ if args.pretrained:
         print("=> no checkpoint found at '{}'".format(args.pretrained))
 
 # Dataset
-from DsZoo import load_data
+from DsZoo_openset import load_data
 import math
 
-sample_ratio = 0.5
+sample_ratio = 1
+user_ratio = 0.9
 if args.ds == 'polyu':
-    clsses = 500
+    clsses = 500* user_ratio
     sampesCls = math.ceil(12 * sample_ratio)
 elif args.ds == 'tjppv':
-    clsses = 600
+    clsses = 600* user_ratio
     sampesCls = math.ceil(20 * sample_ratio)
 elif args.ds == 'iitd':
-    clsses = 460
+    clsses = 460* user_ratio
     sampesCls = math.ceil(5 * sample_ratio)  # 1:1 -> 3:2
 elif args.ds == 'casiam':
-    clsses = 200
+    clsses = 200* user_ratio
     sampesCls = math.ceil(6 * sample_ratio)
 else:
     print('wrong DS', args.ds)
@@ -173,24 +174,38 @@ def test(net, test_loader, epoch, clsses, sampesCls):
     FEATS_prints_binay, FEATS_vein_binay = FEATS_prints > 0, FEATS_vein > 0
     FEATS_prints, FEATS_vein = normalized(FEATS_prints, 1), normalized(FEATS_vein, 1)
 
-    accprints = eval_top1(FEATS_prints_binay, criterion, clsses=clsses, sampesCls=sampesCls)
-    accveins = eval_top1(FEATS_vein_binay, criterion, clsses=clsses, sampesCls=sampesCls)
-    eer_prints_center = eval_eer_hashcenter(FEATS_prints_binay, criterion, clsses=clsses, sampesCls=sampesCls)
-    eer_veins_center = eval_eer_hashcenter(FEATS_vein_binay, criterion, clsses=clsses, sampesCls=sampesCls)
-    eer_fusion_center = eval_eer_fusion_center(FEATS_prints_binay, FEATS_vein_binay, criterion, clsses=clsses,
-                                               sampesCls=sampesCls)
+    # accprints = eval_top1(FEATS_prints_binay, criterion, clsses=clsses, sampesCls=sampesCls)
+    # accveins = eval_top1(FEATS_vein_binay, criterion, clsses=clsses, sampesCls=sampesCls)
+    # eer_prints_center = eval_eer_hashcenter(FEATS_prints_binay, criterion, clsses=clsses, sampesCls=sampesCls)
+    # eer_veins_center = eval_eer_hashcenter(FEATS_vein_binay, criterion, clsses=clsses, sampesCls=sampesCls)
+    # eer_fusion_center = eval_eer_fusion_center(FEATS_prints_binay, FEATS_vein_binay, criterion, clsses=clsses,
+    #                                            sampesCls=sampesCls)
+    # eer_cross = eval_eer_cross(FEATS_prints, FEATS_vein, clsses=clsses, sampesCls=sampesCls)
+    # acc = eval_fusion_top1(FEATS_prints_binay, FEATS_vein_binay, criterion, clsses=clsses, sampesCls=sampesCls)
+    #
     eer_fusion = eval_eer_fusion(FEATS_prints, FEATS_vein, clsses=clsses, sampesCls=sampesCls)
-    eer_cross = eval_eer_cross(FEATS_prints, FEATS_vein, clsses=clsses, sampesCls=sampesCls)
-    acc = eval_fusion_top1(FEATS_prints_binay, FEATS_vein_binay, criterion, clsses=clsses, sampesCls=sampesCls)
+    eer_fusion_hash = eval_eer_fusion(FEATS_prints_binay, FEATS_vein_binay, clsses=clsses, sampesCls=sampesCls, disfun='hamming')
 
-    print('The top1 acc for prints is: \t {:.5f}'.format(accprints))
-    print('The top1 acc for veins is: \t {:.5f}'.format(accveins))
-    print('The top1 acc for fusion is: \t {:.5f}'.format(acc))
-    print('The equal error rate for center hash prints: \t {:.5f}'.format(eer_prints_center))
-    print('The equal error rate for center hash veins: \t  {:.5f}'.format(eer_veins_center))
-    print('The equal error rate for fusion on center is: {:.5f}'.format(eer_fusion_center))
+    eer_prints = eval_eer(FEATS_prints, clsses = clsses, sampesCls = sampesCls, disfun='cossim')
+    eer_veins = eval_eer(FEATS_vein, clsses = clsses, sampesCls = sampesCls, disfun='cossim')
+
+    eer_prints_hash = eval_eer(FEATS_prints_binay, clsses = clsses, sampesCls = sampesCls, disfun='hamming')
+    eer_veins_hash = eval_eer(FEATS_vein_binay, clsses = clsses, sampesCls = sampesCls, disfun='hamming')
+
+    eer_cross = eval_eer_cross(FEATS_prints, FEATS_vein, clsses=clsses, sampesCls=sampesCls)
+    eer_cross_hash = eval_eer_cross(FEATS_prints_binay, FEATS_vein_binay, clsses=clsses, sampesCls=sampesCls, disfun = utils.hamming_sim)
+
+    print('The equal error rate for veins: \t  {:.5f}'.format(eer_veins))
+    print('The equal error rate for prints: \t  {:.5f}'.format(eer_prints))
+
+    print('The equal error rate for veins hashing: \t  {:.5f}'.format(eer_veins_hash))
+    print('The equal error rate for prints hashing: \t  {:.5f}'.format(eer_prints_hash))
+
     print('The equal error rate for fusion is: \t {:.5f}'.format(eer_fusion))
+    print('The equal error rate for fusion hashing is: \t {:.5f}'.format(eer_fusion_hash))
+
     print('The equal error rate for cross is: \t {:.5f}'.format(eer_cross))
+    print('The equal error rate for cross hashing is: \t {:.5f}'.format(eer_cross_hash))
 
     logging.info('epoch at {:.5f}'.format(epoch))
     logging.info('The top1 acc for prints is: \t {:.5f}'.format(accprints))
