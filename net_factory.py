@@ -18,21 +18,30 @@ class Resent18(nn.Module):
         x = self.model(x)
         return x
 
-    
+
 class Resent18hashing(nn.Module):
-    def __init__(self, classes=450):
+    def __init__(self, inchannel=2, bits=1024):
         super(Resent18hashing, self).__init__()
         self.model = models.resnet18(pretrained=True)
-        self.model.fc = nn.Linear(self.model.fc.in_features, 1024)
-        self.model.conv1 = nn.Conv2d(5, 64, kernel_size=7, stride=2, padding=3,bias=False)
+        self.model.fc = nn.Linear(self.model.fc.in_features, bits)
+        self.model.conv1 = nn.Conv2d(inchannel, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.model.fc.weight.data.normal_(0, 0.01)
         self.model.fc.bias.data.fill_(0.0)
-        
+
     def forward(self, x):
         x = self.model(x)
         return x
 
-    
+class Resent182Path(nn.Module):
+    def __init__(self, inchannel1=2, inchannel2=2, bits=1024):
+        super(Resent182Path, self).__init__()
+        self.model1 = Resent18hashing(inchannel=inchannel1, bits=bits)
+        self.model2 = Resent18hashing(inchannel=inchannel2, bits=bits)
+
+    def forward(self, x, y):
+        x = self.model1(x)
+        y = self.model2(y)
+        return x, y
 class mobilenet_v3_largehashing(nn.Module):
     def __init__(self, inchannel=2,bits = 1024):
         super(mobilenet_v3_largehashing, self).__init__()

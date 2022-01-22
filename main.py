@@ -28,12 +28,13 @@ from loss import CSQLoss,ContrastiveLoss
 from UtilsPolyUEval import compute_result_prints_vein,eval_eer_hashcenter,eval_eer_fusion_center,\
     eval_eer_fusion,eval_eer_cross,eval_top1,eval_fusion_top1,\
     normalized,compute_result_prints_vein_2path2
+from utils import accuracy, AverageMeter, save_checkpoint, visualize_graph, get_parameters_size
 
 
 parser = argparse.ArgumentParser(description='PyTorch GCN MNIST Training')
 
 parser.add_argument('--epochs', default=2000, type=int, metavar='N',
-                    help='number of total epochs to run')# resnet 2000 epoch
+                    help='number of total epochs to run')# resnet 2000 epoch; efficiency 500
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
 parser.add_argument('-b', '--batch-size', default=128, type=int,
@@ -67,9 +68,8 @@ def get_config():
         "dataset": args.ds,
         "n_class":500,# pay attention
         "epoch": args.epochs,
-        # "device":torch.device("cpu"),
         "device": torch.device("cuda:0") if use_cuda else torch.device("cpu"),
-        "bit_list": [32,64,128],
+        "bit_list": [32,64,128],#
     }
     return config
 
@@ -106,10 +106,10 @@ model = Resent18hashing(inchannel1=3, inchannel2=3,bits = bit)#GCNCNN
 
 
 # Try to visulize the model
-try:
-	visualize_graph(model, writer, input_size=(1, 1, 128, 128))
-except:
-	print('\nNetwork Visualization Failed! But the training procedure continue.')
+# try:
+# 	visualize_graph(model, writer, input_size=(1, 3, 128, 128))
+# except:
+# 	print('\nNetwork Visualization Failed! But the training procedure continue.')
 
 # Calculate the total parameters of the model
 
@@ -125,14 +125,31 @@ if args.pretrained:
 
 #Dataset
 from DsZoo import load_data
+import math
+sample_ratio = 0.5
+if ds == 'polyu':
+    clsses = 500
+    sampesCls = math.ceil(12*sample_ratio)
+elif ds == 'tjppv':
+    clsses = 600
+    sampesCls = math.ceil(20*sample_ratio)
+elif ds == 'iitd':
+    clsses = 460
+    sampesCls = math.ceil(5*sample_ratio)# 1:1 -> 3:2
+elif ds == 'casiam':
+    clsses = 200
+    sampesCls = math.ceil(6*sample_ratio)
+else:
+    print('wrong DS', ds)
 batch_size = config["batch_size"]
-train_loader = DataLoader(load_data(ds = args.ds,training=True,train_ratio = 1,sample_ratio = 0.666), batch_size=batch_size, shuffle=True, num_workers=8,       pin_memory=True,prefetch_factor=2)  # ,prefetch_factor=2
-test_loader = DataLoader(load_data(ds = args.ds,training=False,train_ratio = 1,sample_ratio = 0.666), batch_size=batch_size, shuffle=False)  # ,prefetch_factor=2
+train_loader = DataLoader(load_data(ds = args.ds,training=True,train_ratio = 1,sample_ratio = sample_ratio), batch_size=batch_size, shuffle=True, num_workers=8,       pin_memory=True,prefetch_factor=2)  # ,prefetch_factor=2
+test_loader = DataLoader(load_data(ds = args.ds,training=False,train_ratio = 1,sample_ratio = sample_ratio), batch_size=batch_size, shuffle=False)  # ,prefetch_factor=2
 # dataset_loader = test_loader
 num_train = len(train_loader.dataset)
 num_test = len(test_loader.dataset)
 print('train num: ',len(train_loader.dataset))
 print('test num: ',len(test_loader.dataset))
+print('train num per class: ',sampesCls)
 
 # batch_size = 32
 model = model.to(device)
@@ -146,12 +163,11 @@ criterion_ctive = ContrastiveLoss() # ContrastiveLoss as the domain gap loss
 scheduler = StepLR(optimizer, step_size=100, gamma=0.9)
 
 
-def test(net,test_loader, epoch):
+def test(net,test_loader, epoch,clsses,sampesCls):
     FEATS_prints, FEATS_vein, GT = compute_result_prints_vein_2path2(test_loader, net, device)
     FEATS_prints_binay,FEATS_vein_binay = FEATS_prints>0,FEATS_vein>0
     FEATS_prints, FEATS_vein = normalized(FEATS_prints,1), normalized(FEATS_vein,1)
-    clsses = 500
-    sampesCls = 4
+
 
     accprints = eval_top1(FEATS_prints_binay,criterion, clsses = clsses, sampesCls = sampesCls)
     accveins = eval_top1(FEATS_vein_binay,criterion, clsses = clsses, sampesCls = sampesCls)
@@ -232,7 +248,7 @@ for epoch in range(args.start_epoch, args.epochs):
     print('------------------------------------------------------------------------')
     train(epoch+1)
     if epoch % 50 ==0:
-        eer = test(model,test_loader, epoch)
+        eer = test(model,test_loader, epoch,clsses,sampesCls)
         if eer < Best_eer:
             Best_eer = eer
             save_checkpoint({
