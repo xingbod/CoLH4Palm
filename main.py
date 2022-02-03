@@ -49,8 +49,8 @@ parser.add_argument('--comment', default='', type=str, metavar='INFO',
                     help='Extra description for tensorboard')
 parser.add_argument('--ds', default='polyu', type=str, metavar='DS',
                     help='Dataset: polyu, casiam, iitd, tjppv')  # use double mark
-parser.add_argument('--model', default='mobile_2path', type=str, metavar='NETWORK',
-                    help='Network to train')
+parser.add_argument('--model', default='effb5', type=str, metavar='NETWORK',
+                    help='Network to train,res18 or effb5')
 args = parser.parse_args()
 
 use_cuda = (args.gpu >= 0) and torch.cuda.is_available()
@@ -68,7 +68,7 @@ def get_config():
         "n_class": 1,  # pay attention, update below
         "epoch": args.epochs,
         "device": torch.device("cuda:0") if use_cuda else torch.device("cpu"),
-        "bit_list": [32, 64, 128],  #
+        "bit_list": [0],  #
     }
     return config
 
@@ -97,13 +97,14 @@ logging.basicConfig(level=logging.DEBUG,  # 控制台打印的日志级别
 # model = efficientnet_b72Path(inchannel1=3, inchannel2=3,bits = bit)#GCNCNN
 # # print(model)
 
-from net_factory import Resent182Path
+from net_factory import Resent182Path,efficientnet_b72Path
 
-# Load model
-model = Resent182Path(inchannel1=3, inchannel2=3, bits=bit)  # GCNCNN
-# print(model)
-
-
+if args.model == 'res18':
+    # Load model
+    model = Resent182Path(inchannel1=3, inchannel2=3, bits=bit)  # GCNCNN
+    # print(model)
+elif args.model == 'effb5':
+    model = efficientnet_b72Path(inchannel1=3, inchannel2=3, bits=bit)
 # Try to visulize the model
 # try:
 # 	visualize_graph(model, writer, input_size=(1, 3, 128, 128))
