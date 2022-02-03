@@ -49,7 +49,7 @@ parser.add_argument('--comment', default='open', type=str, metavar='INFO',
                     help='Extra description for tensorboard')
 parser.add_argument('--ds', default='polyu', type=str, metavar='DS',
                     help='Dataset: polyu, casiam, iitd, tjppv')  # use double mark
-parser.add_argument('--model', default='mobile_2path', type=str, metavar='NETWORK',
+parser.add_argument('--model', default='Resent182Path', type=str, metavar='NETWORK',
                     help='Network to train')
 args = parser.parse_args()
 
@@ -128,27 +128,27 @@ import math
 sample_ratio = 1
 user_ratio = 0.9
 if args.ds == 'polyu':
-    clsses = 500* user_ratio
+    clsses =math.ceil( 500* user_ratio)
     sampesCls = math.ceil(12 * sample_ratio)
 elif args.ds == 'tjppv':
-    clsses = 600* user_ratio
+    clsses =math.ceil( 600* user_ratio)
     sampesCls = math.ceil(20 * sample_ratio)
 elif args.ds == 'iitd':
-    clsses = 460* user_ratio
+    clsses =math.ceil( 460* user_ratio)
     sampesCls = math.ceil(5 * sample_ratio)  # 1:1 -> 3:2
 elif args.ds == 'casiam':
-    clsses = 200* user_ratio
+    clsses = math.ceil(200* user_ratio)
     sampesCls = math.ceil(6 * sample_ratio)
 else:
     print('wrong DS', args.ds)
 
 config["n_class"] = clsses  # pay attention
-
+print('config["n_class"]',config["n_class"],'sampesCls',sampesCls)
 batch_size = config["batch_size"]
-train_loader = DataLoader(load_data(ds=args.ds, training=True, train_ratio=1, sample_ratio=sample_ratio),
+train_loader = DataLoader(load_data(ds=args.ds, training=True, train_ratio=user_ratio, sample_ratio=sample_ratio),
                           batch_size=batch_size, shuffle=True, num_workers=8, pin_memory=True,
                           prefetch_factor=2)  # ,prefetch_factor=2
-test_loader = DataLoader(load_data(ds=args.ds, training=False, train_ratio=1, sample_ratio=sample_ratio),
+test_loader = DataLoader(load_data(ds=args.ds, training=False, train_ratio=user_ratio, sample_ratio=sample_ratio),
                          batch_size=batch_size, shuffle=False)
 
 num_train = len(train_loader.dataset)
@@ -156,7 +156,7 @@ num_test = len(test_loader.dataset)
 print('train num: ', len(train_loader.dataset))
 print('test num: ', len(test_loader.dataset))
 print('train num per class: ', sampesCls)
-
+testclsses = 500 - clsses
 # batch_size = 32
 model = model.to(device)
 print('\nTrainable parameters : {}\n'.format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
@@ -193,7 +193,7 @@ def test(net, test_loader, epoch, clsses, sampesCls):
     eer_veins_hash = eval_eer(FEATS_vein_binay, clsses = clsses, sampesCls = sampesCls, disfun='hamming')
 
     eer_cross = eval_eer_cross(FEATS_prints, FEATS_vein, clsses=clsses, sampesCls=sampesCls)
-    eer_cross_hash = eval_eer_cross(FEATS_prints_binay, FEATS_vein_binay, clsses=clsses, sampesCls=sampesCls, disfun = utils.hamming_sim)
+    eer_cross_hash = eval_eer_cross(FEATS_prints_binay, FEATS_vein_binay, clsses=clsses, sampesCls=sampesCls, disfun = 'hamming')
 
     print('The equal error rate for veins: \t  {:.5f}'.format(eer_veins))
     print('The equal error rate for prints: \t  {:.5f}'.format(eer_prints))
@@ -208,22 +208,22 @@ def test(net, test_loader, epoch, clsses, sampesCls):
     print('The equal error rate for cross hashing is: \t {:.5f}'.format(eer_cross_hash))
 
     logging.info('epoch at {:.5f}'.format(epoch))
-    logging.info('The top1 acc for prints is: \t {:.5f}'.format(accprints))
-    logging.info('The top1 acc for veins is: \t {:.5f}'.format(accveins))
-    logging.info('The top1 acc for fusion is: \t {:.5f}'.format(acc))
-    logging.info('The equal error rate for center hash prints: \t {:.5f}'.format(eer_prints_center))
-    logging.info('The equal error rate for center hash veins: \t  {:.5f}'.format(eer_veins_center))
-    logging.info('The equal error rate for fusion on center is: {:.5f}'.format(eer_fusion_center))
-    logging.info('The equal error rate for fusion is: \t {:.5f}'.format(eer_fusion))
-    logging.info('The equal error rate for cross is: \t {:.5f}'.format(eer_cross))
+    # logging.info('The top1 acc for prints is: \t {:.5f}'.format(accprints))
+    # logging.info('The top1 acc for veins is: \t {:.5f}'.format(accveins))
+    # logging.info('The top1 acc for fusion is: \t {:.5f}'.format(acc))
+    # logging.info('The equal error rate for center hash prints: \t {:.5f}'.format(eer_prints_center))
+    # logging.info('The equal error rate for center hash veins: \t  {:.5f}'.format(eer_veins_center))
+    # logging.info('The equal error rate for fusion on center is: {:.5f}'.format(eer_fusion_center))
+    # logging.info('The equal error rate for fusion is: \t {:.5f}'.format(eer_fusion))
+    # logging.info('The equal error rate for cross is: \t {:.5f}'.format(eer_cross))
 
-    writer.add_scalar('Acc/printstop1', accprints, epoch)
-    writer.add_scalar('Acc/eer_prints_center', eer_prints_center, epoch)
-    writer.add_scalar('Acc/eer_veins_center', eer_veins_center, epoch)
-    writer.add_scalar('Acc/eer_fusion_center', eer_fusion_center, epoch)
+    # writer.add_scalar('Acc/printstop1', accprints, epoch)
+    # writer.add_scalar('Acc/eer_prints_center', eer_prints_center, epoch)
+    # writer.add_scalar('Acc/eer_veins_center', eer_veins_center, epoch)
+    # writer.add_scalar('Acc/eer_fusion_center', eer_fusion_center, epoch)
+    writer.add_scalar('Acc/eer_fusion_hash', eer_fusion_hash, epoch)
+    writer.add_scalar('Acc/eer_cross', eer_cross_hash, epoch)
     writer.add_scalar('Acc/eer_fusion', eer_fusion, epoch)
-    writer.add_scalar('Acc/eer_cross', eer_cross, epoch)
-    writer.add_scalar('Acc/fusion_top1', acc, epoch)
     return eer_cross
 
 
@@ -269,7 +269,7 @@ for epoch in range(args.start_epoch, args.epochs):
     print('------------------------------------------------------------------------')
     train(epoch + 1)
     if epoch % 50 == 0:
-        eer = test(model, test_loader, epoch, clsses, sampesCls)
+        eer = test(model, test_loader, epoch, testclsses, sampesCls)
         if eer < Best_eer:
             Best_eer = eer
             save_checkpoint({

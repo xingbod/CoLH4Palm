@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torchvision import datasets, models, transforms
 import math
 from torch import nn
+from efficientnet_pytorch import EfficientNet
 
 
 class Resent18(nn.Module):
@@ -88,8 +89,28 @@ class efficientnet_b72Path(nn.Module):
     def forward(self, x,y):
         x = self.model1(x)
         y = self.model2(y)
-        return x,y    
-    
+        return x,y
+
+
+class efficientnet_b72Path_share(nn.Module):
+    def __init__(self, inchannel1=2, inchannel2=2, bits=1024):
+        super(efficientnet_b72Path_share, self).__init__()
+        self.model1 = efficientnet_b7hashing(inchannel=inchannel1, bits=bits)
+
+    def forward(self, x, y):
+        x = self.model1(x)
+        y = self.model1(y)
+        return x, y
+
+class Resent182Path_share(nn.Module):
+    def __init__(self, inchannel1=2, inchannel2=2, bits=1024):
+        super(Resent182Path_share, self).__init__()
+        self.model1 = Resent18hashing(inchannel=inchannel1, bits=bits)
+
+    def forward(self, x, y):
+        x = self.model1(x)
+        y = self.model1(y)
+        return x, y
 
 class CNNF(nn.Module):
     def __init__(self,inchannel=1, bits=128, use_dropout=False):

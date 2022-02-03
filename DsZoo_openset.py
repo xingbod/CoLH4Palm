@@ -72,7 +72,8 @@ def part_init_polyu(istrain=True, train_ratio=0.9, sample_ratio=1):
     print("split train users:", train_num)
     print("split train samples:", sample_num, 'total sample:', 12)
 
-    users_permu = np.random.permutation(500)
+    # users_permu = np.random.permutation(500)
+    users_permu = range(500)
     user_permu_train = users_permu[:train_num]
     user_permu_test = users_permu[train_num:]
 
@@ -124,8 +125,8 @@ def part_init_polyu(istrain=True, train_ratio=0.9, sample_ratio=1):
 
                 vein_list.append(imgvein)
                 prints_list.append(imgprint)
-                labels.append(one_hot_embedding(i, train_num))
-    #                 labels.append(i)
+                # labels.append(one_hot_embedding(i, train_num))
+                labels.append(i)
 
     # return np.array(r_list), np.array(b_list), np.array(n_list), np.array(labels),np.array(r_list_test), np.array(b_list_test), np.array(n_list_test), np.array(labels_test)
     return vein_list, prints_list, labels
@@ -146,7 +147,7 @@ def part_init_tjppv(istrain=True, train_ratio=1, sample_ratio=0.666):
     print("split train users:", train_num)
     print("split train samples:", sample_num)
 
-    users_permu = np.random.permutation(600)
+    users_permu =range(600)
     user_permu_train = users_permu[:train_num]
     user_permu_test = users_permu[train_num:]
 
@@ -184,7 +185,8 @@ def part_init_tjppv(istrain=True, train_ratio=1, sample_ratio=0.666):
                     sid = (i) * 10 + j - 10 + 1
                     r_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(tjv_path2, "%05d.bmp" % (sid)))))
                     vein_list.append(r_img)
-                labels.append(one_hot_embedding(i, train_num))
+                # labels.append(one_hot_embedding(i, train_num))
+                labels.append(i)
 
     # return np.array(r_list), np.array(b_list), np.array(n_list), np.array(labels),np.array(r_list_test), np.array(b_list_test), np.array(n_list_test), np.array(labels_test)
     return vein_list, prints_list, labels
@@ -205,7 +207,7 @@ def part_init_iitd(istrain=True, train_ratio=1, sample_ratio=0.666):
     print("split train users:", train_num)
     print("split samples:", sample_num)
 
-    users_permu = np.random.permutation(460)
+    users_permu = range(460)
     user_permu_train = users_permu[:train_num]
     user_permu_test = users_permu[train_num:]
 
@@ -231,7 +233,8 @@ def part_init_iitd(istrain=True, train_ratio=1, sample_ratio=0.666):
                 r_img = np.array(
                     Image.open(os.path.join(iitd_path, "%04d" % (i + 1), "%03d_" % fileid + "%01d.bmp" % (j + 1))))
                 prints_list.append(r_img)
-                labels.append(one_hot_embedding(i, train_num))
+                # labels.append(one_hot_embedding(i, train_num))
+                labels.append(i)
 
     # return np.array(r_list), np.array(b_list), np.array(n_list), np.array(labels),np.array(r_list_test), np.array(b_list_test), np.array(n_list_test), np.array(labels_test)
     return vein_list, prints_list, labels
@@ -296,8 +299,8 @@ def part_init_casiam(istrain=True, train_ratio=1, sample_ratio=0.666):
 
                 vein_list.append(imgvein)
                 prints_list.append(imgprint)
-                labels.append(one_hot_embedding(i, train_num))
-    #                 labels.append(i)
+                # labels.append(one_hot_embedding(i, train_num))
+                labels.append(i)
 
     # return np.array(r_list), np.array(b_list), np.array(n_list), np.array(labels),np.array(r_list_test), np.array(b_list_test), np.array(n_list_test), np.array(labels_test)
     return vein_list, prints_list, labels

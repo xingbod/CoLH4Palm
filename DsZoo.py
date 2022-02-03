@@ -56,7 +56,7 @@ def one_hot_embedding(labels, num_classes):
 
 
 # one_hot_embedding(1, 10)
-def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666):
+def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666, open_set_2nd=False):
     r_list = []
     b_list = []
     vein_list = []
@@ -70,9 +70,25 @@ def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666):
     sample_num = math.ceil(12 * sample_ratio)
     print("split train users:", train_num)
     print("split train samples:", sample_num, 'total sample:', 12)
+
+    users_permu = np.random.RandomState(seed=42).permutation(500)
+    users_permu_train = users_permu[:train_num]
+    users_permu_test = users_permu[train_num:]
+    print("users_permu_train:", users_permu_train)
+    print("users_permu_test:", users_permu_test)
+
+    sample_permu = np.random.RandomState(seed=42).permutation(12)
+    sample_permu_train = sample_permu[:sample_num]
+    sample_permu_test = sample_permu[sample_num:]
+    print("sample_permu_train:", sample_permu_train)
+    print("sample_permu_test:", sample_permu_test)
+
+    if open_set_2nd:  # if openset settings, we train the incremental model on test, test should combine both 1st stage DS and 2nd stage DS
+        users_permu_test = users_permu_train
+
     if istrain:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in range(sample_num):
+        for i in users_permu_train:
+            for j in sample_permu_train:
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(r_img_path, "%04d_" % (i + 1) + "%04d.jpg" % (j + 1)))))
 
@@ -93,11 +109,11 @@ def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666):
 
                 vein_list.append(imgvein)
                 prints_list.append(imgprint)
-                labels.append(one_hot_embedding(i, train_num))
+                labels.append(one_hot_embedding(i, 500))
     #                 labels.append(i)
     else:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in range(sample_num, 12):
+        for i in users_permu_train:
+            for j in sample_permu_test:
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(r_img_path, "%04d_" % (i + 1) + "%04d.jpg" % (j + 1)))))
                 # r_normed = (r_img - r_img.min()) / (r_img.max()-r_img.min())
@@ -117,7 +133,7 @@ def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666):
 
                 vein_list.append(imgvein)
                 prints_list.append(imgprint)
-                labels.append(one_hot_embedding(i, train_num))
+                labels.append(one_hot_embedding(i, 500))
     #                 labels.append(i)
 
     # return np.array(r_list), np.array(b_list), np.array(n_list), np.array(labels),np.array(r_list_test), np.array(b_list_test), np.array(n_list_test), np.array(labels_test)
@@ -126,7 +142,7 @@ def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666):
 
 # Tongji palmprint是20*600=12000张，
 # TJV 20 * 600
-def part_init_tjppv(istrain=True, train_ratio=1, sample_ratio=0.666):
+def part_init_tjppv(istrain=True, train_ratio=1, sample_ratio=0.666, open_set_2nd=False):
     r_list = []
     b_list = []
     vein_list = []
@@ -139,51 +155,60 @@ def part_init_tjppv(istrain=True, train_ratio=1, sample_ratio=0.666):
     print("split train users:", train_num)
     print("split train samples:", sample_num)
 
-    sample_permu = np.random.permutation(20)
+    users_permu = np.random.RandomState(seed=42).permutation(600)
+    users_permu_train = users_permu[:train_num]
+    users_permu_test = users_permu[train_num:]
+    print("users_permu_train:", users_permu_train)
+    print("users_permu_test:", users_permu_test)
+
+    sample_permu = np.random.RandomState(seed=42).permutation(20)
     sample_permu_train = sample_permu[:sample_num]
     sample_permu_test = sample_permu[sample_num:]
     print("sample_permu_train:", sample_permu_train)
     print("sample_permu_test:", sample_permu_test)
 
+    if open_set_2nd:  # if openset settings, we train the incremental model on test, test should combine both 1st stage DS and 2nd stage DS
+        users_permu_test = users_permu_train
+
     if istrain:
-        for i in tqdm.tqdm(range(train_num)):
+        for i in users_permu_train:
             for j in sample_permu_train:
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(tjp_path, "%04d_" % (i + 1) + "%04d.jpg" % (j + 1)))))  # +1
-                prints_list.append(r_img)
+                prints_list.append(np.dstack((r_img, r_img, r_img)))
 
                 if j < 10:
                     sid = (i) * 10 + j + 1
                     r_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(tjv_path, "%05d.bmp" % (sid)))))
-                    vein_list.append(r_img)
+                    vein_list.append(np.dstack((r_img, r_img, r_img)))
                 else:
                     sid = (i) * 10 + j - 10 + 1
                     r_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(tjv_path2, "%05d.bmp" % (sid)))))
-                    vein_list.append(r_img)
-                labels.append(one_hot_embedding(i, train_num))
+                    vein_list.append(np.dstack((r_img, r_img, r_img)))
+                labels.append(one_hot_embedding(i, 600))
     #                 labels.append(i)
     else:
-        for i in tqdm.tqdm(range(train_num)):
+        for i in users_permu_train:
             for j in sample_permu_test:
                 r_img = np.array(
                     ImageOps.autocontrast(Image.open(os.path.join(tjp_path, "%04d_" % (i + 1) + "%04d.jpg" % (j + 1)))))
-                prints_list.append(r_img)
+                prints_list.append(np.dstack((r_img, r_img, r_img)))
                 if j < 10:
                     sid = (i) * 10 + j + 1
                     r_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(tjv_path, "%05d.bmp" % (sid)))))
-                    vein_list.append(r_img)
+                    vein_list.append(np.dstack((r_img, r_img, r_img)))
                 else:
                     sid = (i) * 10 + j - 10 + 1
                     r_img = np.array(ImageOps.autocontrast(Image.open(os.path.join(tjv_path2, "%05d.bmp" % (sid)))))
-                    vein_list.append(r_img)
-                labels.append(one_hot_embedding(i, train_num))
+                    vein_list.append(np.dstack((r_img, r_img, r_img)))
+                labels.append(one_hot_embedding(i, 600))
 
     # return np.array(r_list), np.array(b_list), np.array(n_list), np.array(labels),np.array(r_list_test), np.array(b_list_test), np.array(n_list_test), np.array(labels_test)
     return vein_list, prints_list, labels
 
 
 # IITD datasets是460*5=2300张。
-def part_init_iitd(istrain=True, train_ratio=1, sample_ratio=0.666):
+def part_init_iitd(istrain=True, train_ratio=1, sample_ratio=0.666, open_set_2nd=False):
     r_list = []
     b_list = []
     vein_list = []
@@ -191,36 +216,51 @@ def part_init_iitd(istrain=True, train_ratio=1, sample_ratio=0.666):
     labels = []
 
     # split all data into train, test data
-    train_ratio = 1
     train_num = math.ceil(460 * train_ratio)
     sample_num = math.ceil(5 * sample_ratio)
     print("split train users:", train_num)
     print("split samples:", sample_num)
+
+    users_permu = np.random.RandomState(seed=42).permutation(460)
+    users_permu_train = users_permu[:train_num]
+    users_permu_test = users_permu[train_num:]
+    print("users_permu_train:", users_permu_train)
+    print("users_permu_test:", users_permu_test)
+
+    sample_permu = np.random.RandomState(seed=42).permutation(5)
+    sample_permu_train = sample_permu[:sample_num]
+    sample_permu_test = sample_permu[sample_num:]
+    print("sample_permu_train:", sample_permu_train)
+    print("sample_permu_test:", sample_permu_test)
+
+    if open_set_2nd:  # if openset settings, we train the incremental model on test, test should combine both 1st stage DS and 2nd stage DS
+        users_permu_test = users_permu_train
+
     if sample_num < 2:
         print('attention, testing sample not enough!')
     if istrain:
-        for i in tqdm.tqdm(range(train_num)):
+        for i in users_permu_train:
             fileid = (i) % 230 + 1
-            for j in range(sample_num):
+            for j in sample_permu_train:
                 r_img = np.array(
                     Image.open(os.path.join(iitd_path, "%04d" % (i + 1), "%03d_" % fileid + "%01d.bmp" % (j + 1))))
-                prints_list.append(r_img)
-                labels.append(one_hot_embedding(i, train_num))
+                prints_list.append(np.dstack((r_img, r_img, r_img)))
+                labels.append(one_hot_embedding(i, 460))
     #                 labels.append(i)
     else:
-        for i in tqdm.tqdm(range(train_num)):
+        for i in users_permu_train:
             fileid = (i) % 230 + 1
-            for j in range(sample_num, 5):
+            for j in sample_permu_test:
                 r_img = np.array(
                     Image.open(os.path.join(iitd_path, "%04d" % (i + 1), "%03d_" % fileid + "%01d.bmp" % (j + 1))))
-                prints_list.append(r_img)
-                labels.append(one_hot_embedding(i, train_num))
+                prints_list.append(np.dstack((r_img, r_img, r_img)))
+                labels.append(one_hot_embedding(i, 460))
 
     # return np.array(r_list), np.array(b_list), np.array(n_list), np.array(labels),np.array(r_list_test), np.array(b_list_test), np.array(n_list_test), np.array(labels_test)
     return vein_list, prints_list, labels
 
 
-def part_init_casiam(istrain=True, train_ratio=1, sample_ratio=0.666):
+def part_init_casiam(istrain=True, train_ratio=1, sample_ratio=0.666, open_set_2nd=False):
     r_list = []
     b_list = []
     vein_list = []
@@ -232,11 +272,27 @@ def part_init_casiam(istrain=True, train_ratio=1, sample_ratio=0.666):
     sample_num = math.ceil(6 * sample_ratio)  # 200 users
     print("split train users:", train_num)
     print("split samples:", sample_num)
+
+    users_permu = np.random.RandomState(seed=42).permutation(200)
+    users_permu_train = users_permu[:train_num]
+    users_permu_test = users_permu[train_num:]
+    print("users_permu_train:", users_permu_train)
+    print("users_permu_test:", users_permu_test)
+
+    sample_permu = np.random.RandomState(seed=42).permutation(6)
+    sample_permu_train = sample_permu[:sample_num]
+    sample_permu_test = sample_permu[sample_num:]
+    print("sample_permu_train:", sample_permu_train)
+    print("sample_permu_test:", sample_permu_test)
+
+    if open_set_2nd:  # if openset settings, we train the incremental model on test, test should combine both 1st stage DS and 2nd stage DS
+        users_permu_test = users_permu_train
+
     if sample_num < 2:
         print('attention, testing sample not enough!')
     if istrain:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in range(sample_num):
+        for i in users_permu_train:
+            for j in sample_permu_train:
                 # XXX_(L/R) _ YYY_ZZ .jpg
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(casia_r_img_path, "%03d_" % (i + 1) + "%02d.jpg" % (j + 1)))))
@@ -252,11 +308,11 @@ def part_init_casiam(istrain=True, train_ratio=1, sample_ratio=0.666):
 
                 vein_list.append(imgvein)
                 prints_list.append(imgprint)
-                labels.append(one_hot_embedding(i, train_num))
+                labels.append(one_hot_embedding(i, 200))
     #                 labels.append(i)
     else:
-        for i in tqdm.tqdm(range(train_num)):
-            for j in range(sample_num, 6):
+        for i in users_permu_train:
+            for j in sample_permu_test:
                 r_img = np.array(ImageOps.autocontrast(
                     Image.open(os.path.join(casia_r_img_path, "%03d_" % (i + 1) + "%02d.jpg" % (j + 1)))))
 
@@ -271,7 +327,7 @@ def part_init_casiam(istrain=True, train_ratio=1, sample_ratio=0.666):
 
                 vein_list.append(imgvein)
                 prints_list.append(imgprint)
-                labels.append(one_hot_embedding(i, train_num))
+                labels.append(one_hot_embedding(i, 200))
     #                 labels.append(i)
 
     # return np.array(r_list), np.array(b_list), np.array(n_list), np.array(labels),np.array(r_list_test), np.array(b_list_test), np.array(n_list_test), np.array(labels_test)
@@ -295,15 +351,15 @@ class load_data(Dataset):
             transforms.ToTensor(),
             # transforms.Resize((128, 128)),#
             transforms.Normalize([0.485, 0.456, 0.406],
-                                 [0.229, 0.224, 0.225]),
-        ])
+                                 [0.229, 0.224, 0.225]), ])
+
         self.transform_test = transforms.Compose([
             transforms.ToPILImage(),
             # transforms.Resize((128, 128)),#
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406],
-                                 [0.229, 0.224, 0.225]),
-        ])
+                                 [0.229, 0.224, 0.225]), ])
+
         if self.training:
             print('\n...... Train files loading\n')
             if ds == 'polyu':
@@ -360,7 +416,7 @@ class load_data(Dataset):
 class load_data_single_channel(Dataset):
     """Loads the Data."""
 
-    def __init__(self, ds='polyu', training=True, train_ratio=1, sample_ratio=0.666):
+    def __init__(self, ds='polyu', training=True, train_ratio=0.9, sample_ratio=0.666):
 
         self.training = training
         #         r_list, b_list, n_list, labels,r_list_test, b_list_test, n_list_test, labels_test = part_init()
