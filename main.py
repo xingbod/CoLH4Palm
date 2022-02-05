@@ -23,6 +23,7 @@ from torch.nn import DataParallel
 import tqdm
 
 from loss import CSQLoss, ContrastiveLoss
+import pickle
 
 from UtilsPolyUEval import compute_result_prints_vein, eval_eer_hashcenter, eval_eer_fusion_center, \
     eval_eer_fusion, eval_eer_cross, eval_top1, eval_fusion_top1, \
@@ -67,7 +68,7 @@ def get_config():
         "dataset": args.ds,
         "n_class": 1,  # pay attention, update below
         "epoch": args.epochs,
-        "device": torch.device("cuda:0") if use_cuda else torch.device("cpu"),
+        "device": torch.device("cuda:"+str(args.gpu)) if use_cuda else torch.device("cpu"),
         "bit_list": [0],  #
     }
     return config
@@ -97,7 +98,7 @@ logging.basicConfig(level=logging.DEBUG,  # 控制台打印的日志级别
 # model = efficientnet_b72Path(inchannel1=3, inchannel2=3,bits = bit)#GCNCNN
 # # print(model)
 
-from net_factory import Resent182Path,efficientnet_b72Path
+from net_factory import Resent182Path,efficientnet_b72Path,mobilenet_v3_largehashing2Path
 
 if args.model == 'res18':
     # Load model
@@ -105,6 +106,8 @@ if args.model == 'res18':
     # print(model)
 elif args.model == 'effb5':
     model = efficientnet_b72Path(inchannel1=3, inchannel2=3, bits=bit)
+elif args.model == 'mobile':
+    model = mobilenet_v3_largehashing2Path(inchannel1=3, inchannel2=3, bits=bit)
 # Try to visulize the model
 # try:
 # 	visualize_graph(model, writer, input_size=(1, 3, 128, 128))
@@ -210,7 +213,7 @@ def test(net, test_loader, epoch, clsses, sampesCls):
     writer.add_scalar('Acc/eer_fusion', eer_fusion, epoch)
     writer.add_scalar('Acc/eer_cross', eer_cross, epoch)
     writer.add_scalar('Acc/fusion_top1', acc, epoch)
-    return eer_cross
+    return eer_cross,FEATS_prints, FEATS_vein
 
 
 def train(epoch):
@@ -255,7 +258,7 @@ for epoch in range(args.start_epoch, args.epochs):
     print('------------------------------------------------------------------------')
     train(epoch + 1)
     if epoch % 50 == 0:
-        eer = test(model, test_loader, epoch, clsses, sampesCls)
+        eer,FEATS_prints, FEATS_vein = test(model, test_loader, epoch, clsses, sampesCls)
         if eer < Best_eer:
             Best_eer = eer
             save_checkpoint({
@@ -264,6 +267,11 @@ for epoch in range(args.start_epoch, args.epochs):
                 'best_prec1': Best_eer,
                 'optimizer': optimizer.state_dict(),
             }, True, filename='checkpoint' + remarks + '.pth.tar', remark=remarks)
+            # write python dict to a file
+            mydict = {'FEATS_prints': FEATS_prints, 'FEATS_vein': FEATS_vein, 'epoch': epoch + 1, 'best_eer': Best_eer }
+            output = open('FEATS' + remarks + '.pkl', 'wb')
+            pickle.dump(mydict, output)
+            output.close()
         print("%s epoch:%d, bit:%d, dataset:%s,eer:%.5f, Best eer: %.5f" % (
             config["info"], epoch + 1, bit, config["dataset"], eer, Best_eer))
 

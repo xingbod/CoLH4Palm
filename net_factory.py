@@ -7,6 +7,7 @@ import math
 from torch import nn
 from efficientnet_pytorch import EfficientNet
 
+# pip install efficientnet_pytorch
 
 class Resent18(nn.Module):
     def __init__(self, classes=450):
