@@ -24,7 +24,7 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 class CSQLoss(torch.nn.Module):
     def __init__(self, config, bit):
         super(CSQLoss, self).__init__()
-        self.is_single_label = config["dataset"] not in {"nuswide_21", "nuswide_21_m", "coco"}
+        self.is_single_label = True
         self.hash_targets = self.get_hash_targets(config["n_class"], bit).to(config["device"])
         self.multi_label_random_center = torch.randint(2, (bit,)).float().to(config["device"])
         self.criterion = torch.nn.BCELoss().to(config["device"])
@@ -53,7 +53,7 @@ class CSQLoss(torch.nn.Module):
         H_K = hadamard(bit)
         H_2K = np.concatenate((H_K, -H_K), 0)
         hash_targets = torch.from_numpy(H_2K[:n_class]).float()
-
+        random.seed(30)# fix seed for duplication
         if H_2K.shape[0] < n_class:
             hash_targets.resize_(n_class, bit)
             for k in tqdm.tqdm(range(20)):
@@ -80,8 +80,9 @@ class CSQLoss(torch.nn.Module):
                     break
         return hash_targets
 
+
 ##### INSPECT FEATURES
-#自定义ContrastiveLoss
+# 自定义ContrastiveLoss
 class ContrastiveLoss(torch.nn.Module):
     """
     Contrastive loss function.
@@ -92,10 +93,11 @@ class ContrastiveLoss(torch.nn.Module):
         super(ContrastiveLoss, self).__init__()
         self.margin = margin
 
-    def forward(self, output1, output2, label):#label = 0 / 1 -> same / diff
-        euclidean_distance = F.pairwise_distance(output1, output2, keepdim = True)
+    def forward(self, output1, output2, label):  # label = 0 / 1 -> same / diff
+        euclidean_distance = F.pairwise_distance(output1, output2, keepdim=True)
         loss_contrastive = torch.mean((label) * torch.pow(euclidean_distance, 2) +
-                                      (1-label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
+                                      (1 - label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0),
+                                                              2))
 
         return loss_contrastive
 
@@ -108,14 +110,14 @@ class CSQCrossLoss(torch.nn.Module):
         self.multi_label_random_center = torch.randint(2, (bit,)).float().to(config["device"])
         self.criterion = torch.nn.BCELoss().to(config["device"])
         self.bit = bit
-        
+
     def forward(self, u, y, ind, config):
         u = u.tanh()
         hash_center = self.label2center(y)
-        center_loss1 = self.criterion(0.5 * (u[:,:self.bit] + 1), 0.5 * (hash_center + 1))
-        center_loss2 = self.criterion(0.5 * (u[:,self.bit:] + 1), 0.5 * (hash_center + 1))
+        center_loss1 = self.criterion(0.5 * (u[:, :self.bit] + 1), 0.5 * (hash_center + 1))
+        center_loss2 = self.criterion(0.5 * (u[:, self.bit:] + 1), 0.5 * (hash_center + 1))
         center_loss = center_loss1 + center_loss2
-        
+
         #  cross loss
         # cross_loss = self.criterion(0.5 * (u[:,:self.bit] + 1), 0.5 * (u[:,self.bit:] + 1))
 
@@ -138,6 +140,7 @@ class CSQCrossLoss(torch.nn.Module):
         H_K = hadamard(bit)
         H_2K = np.concatenate((H_K, -H_K), 0)
         hash_targets = torch.from_numpy(H_2K[:n_class]).float()
+        random.seed(30)
 
         if H_2K.shape[0] < n_class:
             hash_targets.resize_(n_class, bit)

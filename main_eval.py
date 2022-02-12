@@ -27,7 +27,7 @@ import pickle
 
 from UtilsPolyUEval import compute_result_prints_vein, eval_eer_hashcenter, eval_eer_fusion_center, \
     eval_eer_fusion, eval_eer_cross, eval_top1, eval_fusion_top1, \
-    normalized, compute_result_prints_vein_2path2, compute_result_prints_vein_2path_iitd, eval_eer
+    normalized, compute_result_prints_vein_2path2,compute_result_prints_vein_2path_iitd,eval_eer
 from utils import accuracy, AverageMeter, save_checkpoint, visualize_graph, get_parameters_size
 
 parser = argparse.ArgumentParser(description='PyTorch GCN MNIST Training')
@@ -68,7 +68,7 @@ def get_config():
         "dataset": args.ds,
         "n_class": 1,  # pay attention, update below
         "epoch": args.epochs,
-        "device": torch.device("cuda:" + str(args.gpu)) if use_cuda else torch.device("cpu"),
+        "device": torch.device("cuda:"+str(args.gpu)) if use_cuda else torch.device("cpu"),
         "bit_list": [0],  #
     }
     return config
@@ -98,15 +98,14 @@ logging.basicConfig(level=logging.DEBUG,  # 控制台打印的日志级别
 # model = efficientnet_b72Path(inchannel1=3, inchannel2=3,bits = bit)#GCNCNN
 # # print(model)
 
-from net_factory import Resent18hashing, efficientnet_b7hashing, mobilenet_v3_largehashing
-from net_factory import Resent182Path, efficientnet_b72Path, mobilenet_v3_largehashing2Path
+from net_factory import Resent18hashing,efficientnet_b7hashing,mobilenet_v3_largehashing
+from net_factory import Resent182Path,efficientnet_b72Path,mobilenet_v3_largehashing2Path
 # Dataset
 import math
 
 if args.ds == 'iitd':
     inchannel = 1
     from DsZoo import load_data_single_channel as load_data
-
     if args.model == 'res18':
         # Load model
         model = Resent18hashing(inchannel=inchannel, bits=bit)
@@ -212,170 +211,50 @@ def test(net, test_loader, epoch, clsses, sampesCls):
     print('The equal error rate for fusion is: \t {:.5f}'.format(eer_fusion))
     print('The equal error rate for cross is: \t {:.5f}'.format(eer_cross))
 
-    logging.info('epoch at {:.5f}'.format(epoch))
-    logging.info('The top1 acc for prints is: \t {:.5f}'.format(accprints))
-    logging.info('The top1 acc for veins is: \t {:.5f}'.format(accveins))
-    logging.info('The top1 acc for fusion is: \t {:.5f}'.format(acc))
-    logging.info('The equal error rate for center hash prints: \t {:.5f}'.format(eer_prints_center))
-    logging.info('The equal error rate for center hash veins: \t  {:.5f}'.format(eer_veins_center))
-    logging.info('The equal error rate for fusion on center is: {:.5f}'.format(eer_fusion_center))
-    logging.info('The equal error rate for fusion is: \t {:.5f}'.format(eer_fusion))
-    logging.info('The equal error rate for cross is: \t {:.5f}'.format(eer_cross))
+    return eer_cross,FEATS_prints, FEATS_vein
 
-    writer.add_scalar('Acc/printstop1', accprints, epoch)
-    writer.add_scalar('Acc/eer_prints_center', eer_prints_center, epoch)
-    writer.add_scalar('Acc/eer_veins_center', eer_veins_center, epoch)
-    writer.add_scalar('Acc/eer_fusion_center', eer_fusion_center, epoch)
-    writer.add_scalar('Acc/eer_fusion', eer_fusion, epoch)
-    writer.add_scalar('Acc/eer_cross', eer_cross, epoch)
-    writer.add_scalar('Acc/fusion_top1', acc, epoch)
-    return eer_cross, FEATS_prints, FEATS_vein
-
-
-def train(epoch):
-    current_time = time.strftime('%H:%M:%S', time.localtime(time.time()))
-    print("%s[%2d/%2d][%s] bit:%d, dataset:%s, training...." % (
-        config["info"], epoch + 1, config["epoch"], current_time, bit, config["dataset"]), end="")
-    model.train()
-    train_loss = 0
-    for batch_idx, img in enumerate(train_loader):
-        in1 = img[0].to(device, dtype=torch.float)
-        in2 = img[1].to(device, dtype=torch.float)
-        label = img[2].to(device)
-        optimizer.zero_grad()
-        u1, u2 = model(in1, in2)
-
-        loss1, (center_loss1, Q_loss1) = criterion(u1, label.float(), 0, config)
-        loss2, (center_loss2, Q_loss2) = criterion(u2, label.float(), 0, config)
-        # img0维度为torch.Size([32, 1, 100, 100])，32是batch，label为torch.Size([32, 1])
-
-        perms = torch.randperm(u1.shape[0])  # plan to perm the U2
-        u2, label2 = u2[perms, :], label[perms]
-        label3 = (label2 == label) * 1
-        loss3 = criterion_ctive(u1, u2, label3)
-
-        loss = loss1 + loss2 + loss3 * 0.0001
-        train_loss += loss.item()
-
-        loss.backward()
-        optimizer.step()
-    train_loss = train_loss / num_train
-    writer.add_scalar('Loss/Train', train_loss, epoch)
-    writer.add_scalar('Loss/center_loss', center_loss1.item(), epoch)
-    writer.add_scalar('Loss/Q_loss', Q_loss1.item(), epoch)
-    writer.add_scalar('Loss/c_loss', loss3.item(), epoch)
-    print("\b\b\b loss:%.5f,center_loss:%.5f,Q_loss:%.5f,loss3:%.5f,lr:%.6f" % (
-        train_loss, center_loss1, Q_loss1, loss3, optimizer.param_groups[0]['lr']))  ##loss:0.625
-    # scheduler.step()
-
-
-def train_iitd(epoch):
-    current_time = time.strftime('%H:%M:%S', time.localtime(time.time()))
-    print("%s[%2d/%2d][%s] bit:%d, dataset:%s, training...." % (
-        config["info"], epoch + 1, config["epoch"], current_time, bit, config["dataset"]), end="")
-    model.train()
-    train_loss = 0
-    for batch_idx, img in enumerate(train_loader):
-        in1 = img[0].to(device, dtype=torch.float)
-        label = img[1].to(device)
-        optimizer.zero_grad()
-        u1 = model(in1)
-
-        loss, (center_loss1, Q_loss1) = criterion(u1, label.float(), 0, config)
-        # img0维度为torch.Size([32, 1, 100, 100])，32是batch，label为torch.Size([32, 1])
-
-        train_loss += loss.item()
-
-        loss.backward()
-        optimizer.step()
-    train_loss = train_loss / num_train
-    writer.add_scalar('Loss/Train', train_loss, epoch)
-    writer.add_scalar('Loss/center_loss', center_loss1.item(), epoch)
-    writer.add_scalar('Loss/Q_loss', Q_loss1.item(), epoch)
-    print("\b\b\b loss:%.5f,center_loss:%.5f,Q_loss:%.5f,loss3:%.5f,lr:%.6f" % (
-        train_loss, center_loss1, Q_loss1, 0, optimizer.param_groups[0]['lr']))  ##loss:0.625
-    # scheduler.step()
-
-
-def test_iitd(net, test_loader, epoch, clsses, sampesCls):
+def test_iitd(net,test_loader, epoch,clsses,sampesCls):
     FEATS_prints, FEATS_vein, GT = compute_result_prints_vein_2path_iitd(test_loader, net, device)
-    FEATS_prints_binay = FEATS_prints > 0
-    FEATS_prints = normalized(FEATS_prints, 1)
+    FEATS_prints_binay = FEATS_prints>0
+    FEATS_prints = normalized(FEATS_prints,1)
 
-    accprints = eval_top1(FEATS_prints_binay, criterion, clsses=clsses, sampesCls=sampesCls)
+
+    accprints = eval_top1(FEATS_prints_binay,criterion, clsses = clsses, sampesCls = sampesCls)
     accveins = 0
+    
+    eer_prints_center = eval_eer_hashcenter(FEATS_prints_binay,criterion, clsses = clsses, sampesCls = sampesCls)
+    eer_prints = eval_eer(FEATS_prints, clsses = clsses, sampesCls = sampesCls, disfun='cossim')
+    eer_prints_hash = eval_eer(FEATS_prints_binay, clsses = clsses, sampesCls = sampesCls, disfun='hamming')
 
-    eer_prints_center = eval_eer_hashcenter(FEATS_prints_binay, criterion, clsses=clsses, sampesCls=sampesCls)
-    eer_prints = eval_eer(FEATS_prints, clsses=clsses, sampesCls=sampesCls, disfun='cossim')
-    eer_prints_hash = eval_eer(FEATS_prints_binay, clsses=clsses, sampesCls=sampesCls, disfun='hamming')
-
-    eer_veins_center = 0
-    eer_fusion_center = 0
+    eer_veins_center =0
+    eer_fusion_center =0
     eer_fusion = 0
     eer_cross = 0
     acc = 0
-
-    print('The top1 acc for prints is: \t {:.5f}'.format(accprints))
+    
+    print('The top1 acc for prints is: \t {:.5f}'.format(accprints))    
     # print('The top1 acc for veins is: \t {:.5f}'.format(accveins))
     # print('The top1 acc for fusion is: \t {:.5f}'.format(acc))
     print('The equal error rate for center hash prints: \t {:.5f}'.format(eer_prints_center))
     # print('The equal error rate for center hash veins: \t  {:.5f}'.format(eer_veins_center))
     # print('The equal error rate for fusion on center is: {:.5f}'.format(eer_fusion_center))
     # print('The equal error rate for fusion is: \t {:.5f}'.format(eer_fusion))
-
+    
     print('The equal error rate for prints is: \t {:.5f}'.format(eer_prints))
     print('The equal error rate for prints hashing is: \t {:.5f}'.format(eer_prints_hash))
 
-    logging.info('epoch at {:.5f}'.format(epoch))
-    logging.info('The top1 acc for prints is: \t {:.5f}'.format(accprints))
-    logging.info('The top1 acc for veins is: \t {:.5f}'.format(accveins))
-    logging.info('The top1 acc for fusion is: \t {:.5f}'.format(acc))
-    logging.info('The equal error rate for center hash prints: \t {:.5f}'.format(eer_prints_center))
-    logging.info('The equal error rate for center hash veins: \t  {:.5f}'.format(eer_veins_center))
-    logging.info('The equal error rate for fusion on center is: {:.5f}'.format(eer_fusion_center))
-    logging.info('The equal error rate for fusion is: \t {:.5f}'.format(eer_fusion))
-    logging.info('The equal error rate for prints is: \t {:.5f}'.format(eer_prints))
-    logging.info('The equal error rate for prints_hash is: \t {:.5f}'.format(eer_prints_hash))
-
-    writer.add_scalar('Acc/printstop1', accprints, epoch)
-    writer.add_scalar('Acc/eer_prints_center', eer_prints_center, epoch)
-    writer.add_scalar('Acc/eer_veins_center', eer_veins_center, epoch)
-    writer.add_scalar('Acc/eer_fusion_center', eer_fusion_center, epoch)
-    writer.add_scalar('Acc/eer_fusion', eer_fusion, epoch)
-    writer.add_scalar('Acc/eer_cross', eer_cross, epoch)
-    writer.add_scalar('Acc/fusion_top1', acc, epoch)
-    return eer_prints, FEATS_prints, FEATS_vein
+    return eer_prints,FEATS_prints, FEATS_vein
 
 
-Best_eer = 1.0
-for epoch in range(args.start_epoch, args.epochs):
-    print('------------------------------------------------------------------------')
-    if args.ds == 'iitd':
-        train_iitd(epoch + 1)
-    else:
-        train(epoch + 1)
-    if epoch % 50 == 0:
-        if args.ds == 'iitd':
-            eer, FEATS_prints, FEATS_vein = test_iitd(model, test_loader, epoch, clsses, 5 - sampesCls)
-        else:
-            eer, FEATS_prints, FEATS_vein = test(model, test_loader, epoch, clsses, sampesCls)
-        if eer < Best_eer:
-            Best_eer = eer
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'best_prec1': Best_eer,
-                'optimizer': optimizer.state_dict(),
-            }, True, filename='checkpoint' + remarks + '.pth.tar', remark=remarks)
-            # write python dict to a file
-            mydict = {'FEATS_prints': FEATS_prints, 'FEATS_vein': FEATS_vein, 'epoch': epoch + 1, 'best_eer': Best_eer}
-            output = open('FEATS' + remarks + '.pkl', 'wb')
-            pickle.dump(mydict, output)
-            output.close()
-        print("%s epoch:%d, bit:%d, dataset:%s,eer:%.5f, Best eer: %.5f" % (
-            config["info"], epoch + 1, bit, config["dataset"], eer, Best_eer))
+remarks = config['net'] + config['dataset'] + config['info'] + str(bit)
+epoch = 0
+if args.ds == 'iitd':
+    eer,FEATS_prints, FEATS_vein = test_iitd(model, test_loader, epoch, clsses, 5-sampesCls)
+else:
+    eer,FEATS_prints, FEATS_vein = test(model, test_loader, epoch, clsses, sampesCls)
 
-print('Finished!')
-print('Best Best_eer:{:.2f}'.format(Best_eer))
-writer.add_scalar('Best Best_eer', Best_eer, 0)
-writer.close()
+    
+mydict = {'FEATS_prints': FEATS_prints, 'FEATS_vein': FEATS_vein, 'epoch': epoch + 1, 'best_eer': 0 }
+output = open('FEATS_EVAL_' + remarks + '.pkl', 'wb')
+pickle.dump(mydict, output)
+output.close()

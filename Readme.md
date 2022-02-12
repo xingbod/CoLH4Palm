@@ -30,3 +30,29 @@ python main.py  -b 512 --ds "tjppv" --bits 128 --model mobile --comment tjMobile
 python main.py  -b 512 --ds "polyu" --bits 128 --model mobile --comment poMobile128 --epoch 4000
 
 python main.py  -b 512 --ds "casiam" --bits 128 --model mobile --comment caMobile128 --epoch 4000
+
+
+python main.py  -b 512 --ds "tjppv" --bits 64 --model mobile --comment tjMobile64 --epoch 4000
+
+python main.py  -b 512 --ds "polyu" --bits 64 --model mobile --comment poMobile64 --epoch 4000
+
+python main.py  -b 512 --ds "casiam" --bits 64 --model mobile --comment caMobile64 --epoch 4000
+
+
+python main.py  -b 512 --ds "tjppv" --bits 32 --model mobile --comment tjMobile32 --epoch 4000
+
+python main.py  -b 512 --ds "polyu" --bits 32 --model mobile --comment poMobile32 --epoch 4000
+
+python main.py  -b 512 --ds "casiam" --bits 32 --model mobile --comment caMobile32 --epoch 4000 --gpu 1
+
+
+
+python main.py  -b 32 --ds "polyu" --bits 128 --model effb5 --comment ponewEff32 --epoch 4000
+
+python main.py  -b 32 --ds "tjppv" --bits 128 --model effb5 --comment tjnewEff32 --epoch 4000
+
+
+
+python main.py  -b 32 --ds "iitd" --bits 128 --model effb5 --comment iitdnewEff128 --epoch 4000
+
+python main.py  -b 512 --ds "iitd" --bits 128 --model res18 --comment iitdnewRes128 --epoch 4000

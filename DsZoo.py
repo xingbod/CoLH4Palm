@@ -71,7 +71,8 @@ def part_init_polyu(istrain=True, train_ratio=1, sample_ratio=0.666, open_set_2n
     print("split train users:", train_num)
     print("split train samples:", sample_num, 'total sample:', 12)
 
-    users_permu = np.random.RandomState(seed=42).permutation(500)
+#     users_permu = np.random.RandomState(seed=42).permutation(500)
+    users_permu = np.array(range(500))
     users_permu_train = users_permu[:train_num]
     users_permu_test = users_permu[train_num:]
     print("users_permu_train:", users_permu_train)
@@ -155,7 +156,8 @@ def part_init_tjppv(istrain=True, train_ratio=1, sample_ratio=0.666, open_set_2n
     print("split train users:", train_num)
     print("split train samples:", sample_num)
 
-    users_permu = np.random.RandomState(seed=42).permutation(600)
+#     users_permu = np.random.RandomState(seed=42).permutation(600)
+    users_permu = np.array(range(600))
     users_permu_train = users_permu[:train_num]
     users_permu_test = users_permu[train_num:]
     print("users_permu_train:", users_permu_train)
@@ -221,7 +223,8 @@ def part_init_iitd(istrain=True, train_ratio=1, sample_ratio=0.666, open_set_2nd
     print("split train users:", train_num)
     print("split samples:", sample_num)
 
-    users_permu = np.random.RandomState(seed=42).permutation(460)
+    # users_permu = np.random.RandomState(seed=42).permutation(460)
+    users_permu = np.array(range(460))
     users_permu_train = users_permu[:train_num]
     users_permu_test = users_permu[train_num:]
     print("users_permu_train:", users_permu_train)
@@ -273,7 +276,8 @@ def part_init_casiam(istrain=True, train_ratio=1, sample_ratio=0.666, open_set_2
     print("split train users:", train_num)
     print("split samples:", sample_num)
 
-    users_permu = np.random.RandomState(seed=42).permutation(200)
+#     users_permu = np.random.RandomState(seed=42).permutation(200)
+    users_permu = np.array(range(200))
     users_permu_train = users_permu[:train_num]
     users_permu_test = users_permu[train_num:]
     print("users_permu_train:", users_permu_train)
@@ -443,35 +447,17 @@ class load_data_single_channel(Dataset):
         ])
         if self.training:
             print('\n...... Train files loading\n')
-            if ds == 'polyu':
-                self.vein_list, self.prints_list, self.labels = part_init_polyu(istrain=True, train_ratio=train_ratio,
-                                                                                sample_ratio=sample_ratio)
-            elif ds == 'tjppv':
-                self.vein_list, self.prints_list, self.labels = part_init_tjppv(istrain=True, train_ratio=train_ratio,
-                                                                                sample_ratio=sample_ratio)
-            elif ds == 'iitd':
+            if ds == 'iitd':
                 self.vein_list, self.prints_list, self.labels = part_init_iitd(istrain=True, train_ratio=train_ratio,
                                                                                sample_ratio=sample_ratio)
-            elif ds == 'casiam':
-                self.vein_list, self.prints_list, self.labels = part_init_casiam(istrain=True, train_ratio=train_ratio,
-                                                                                 sample_ratio=sample_ratio)
             else:
                 print('wrong DS', ds)
             print('\nTrain files loaded ......\n')
         else:
             print('\n...... Test files loading\n')
-            if ds == 'polyu':
-                self.vein_list, self.prints_list, self.labels = part_init_polyu(istrain=False, train_ratio=train_ratio,
-                                                                                sample_ratio=sample_ratio)
-            elif ds == 'tjppv':
-                self.vein_list, self.prints_list, self.labels = part_init_tjppv(istrain=False, train_ratio=train_ratio,
-                                                                                sample_ratio=sample_ratio)
-            elif ds == 'iitd':
+            if ds == 'iitd':
                 self.vein_list, self.prints_list, self.labels = part_init_iitd(istrain=False, train_ratio=train_ratio,
                                                                                sample_ratio=sample_ratio)
-            elif ds == 'casiam':
-                self.vein_list, self.prints_list, self.labels = part_init_casiam(istrain=False, train_ratio=train_ratio,
-                                                                                 sample_ratio=sample_ratio)
             else:
                 print('wrong DS', ds)
             print('\nTest files loaded ......\n')
